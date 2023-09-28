@@ -47,27 +47,38 @@ class Scores;
 * PSM - Peptide Spectrum Match
 *
 */
-class ScoreHolder {
+class ScoreBase {
  public:
-  double score, q, pep, p;
+  double score;
   PSMDescription* pPSM;
   int label;
   
-  ScoreHolder() : score(0.0), q(0.0), pep(0.0), p(0.0), label(0), pPSM(NULL) {}
-  ScoreHolder(const double s, const int l, PSMDescription* psm = NULL) :
-    score(s), q(0.0), pep(0.0), p(0.0), label(l), pPSM(psm) {}
-  virtual ~ScoreHolder() {}
+  ScoreBase() : score(0.0), label(0), pPSM(NULL) {}
+  ScoreBase(const double s, const int l, PSMDescription* psm = NULL) :
+    score(s), label(l), pPSM(psm) {}
+  virtual ~ScoreBase() {}
   
   std::pair<double, bool> toPair() const { 
     return pair<double, bool> (score, label > 0); 
   }
   
-  inline bool isTarget() const { return label != -1; }
-  inline bool isDecoy() const { return label == -1; }
+  inline bool isTarget() const { return label >= 0; }
+  inline bool isDecoy() const { return label < 0; }
+  std::string getCharge(std::string id);
+};
+
+class ScoreHolder : public ScoreBase {
+ public:
+  double q, pep, p;
+  
+  ScoreHolder() : ScoreBase(), q(0.0), pep(0.0), p(0.0) {}
+  ScoreHolder(const double s, const int l, PSMDescription* psm = NULL) :
+      ScoreBase(s, l, pPSM), q(0.0), pep(0.0), p(0.0) {}
+  virtual ~ScoreHolder() {}
+  
   void printPSM(ostream& os, bool printDecoys, bool printExpMass);
   void printPepXML(ostream& os, map<char,float> &aaWeight, int index);
   void printPeptide(ostream& os, bool printDecoys, bool printExpMass, Scores& fullset);
-  std::string getCharge(std::string id);
 };
 struct lessThanBaseName
 {
@@ -161,6 +172,34 @@ inline string getRidOfUnprintablesAndUnicode(string inpString) {
   }
   return outputs;
 }
+
+// Super class for implementing the Reset algorithm
+// The class holds multiple Scoreholders. 
+class SpectrumScore : public ScoreHolder {
+  public:
+    /**
+     * @brief Super class for implementing the Reset algorithm. The class holds multiple ScoreBase:s.
+     */
+    SpectrumScore(ScoreBase* pTarg, ScoreBase* pDec1, ScoreBase* pDec2) : ScoreHolder(), pTargetPSM(pTarg), pDecoy1PSM(pDec1), pDecoy2PSM(pDec2) {}; 
+    SpectrumScore() : ScoreHolder(), pTargetPSM(NULL), pDecoy1PSM(NULL), pDecoy2PSM(NULL) {};
+    virtual ~SpectrumScore() {};
+    int selectBestPSM() {
+      ScoreBase* pWinner = pDecoy2PSM;
+      if pTargetPSM->score > pDecoy1PSM->score {
+        if pTargetPSM->score > pDecoy2PSM->score { pWinner = pTargetPSM;}
+      } else {
+        if pDecoy1PSM->score > pDecoy2PSM->score { pWinner = pDecoy1PSM;} 
+      }
+      pPSM = pWinner->pPSM;
+      score = pWinner->score;
+      label = pWinner->label;
+      return label;
+    } 
+  protected:
+    ScoreBase* pTargetPSM;    
+    ScoreBase* pDecoy1PSM;    
+    ScoreBase* pDecoy2PSM;    
+};
 
 class SetHandler;
 class AlgIn;
