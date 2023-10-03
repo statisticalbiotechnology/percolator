@@ -78,7 +78,7 @@ int const SetHandler::getLabel(int setPos) {
   return subsets_[static_cast<std::size_t>(setPos)]->getLabel();
 }
 
-int SetHandler::readTab(istream& dataStream, SanityCheck*& pCheck) {
+int SetHandler::readTab(istream& dataStream, SanityCheck*& pCheck, bool twoDecoySets) {
   std::vector<double> noWeights;
   Scores noScores(true);
   return readAndScoreTab(dataStream, noWeights, noScores, pCheck);
@@ -505,7 +505,8 @@ void SetHandler::readAndScorePSMs(istream& dataStream, std::string& psmLine,
     }
     psmLine = rtrim(psmLine);
     ScoreHolder sh;
-    sh.label = DataSet::readPsm(psmLine, lineNr, optionalFields, readProteins, sh.pPSM, featurePool_, decoyPrefix);
+    int label = DataSet::readPsm(psmLine, lineNr, optionalFields, readProteins, sh.pPSM_, featurePool_, decoyPrefix);
+    sh.setLabel(label);
     allScores.scoreAndAddPSM(sh, rawWeights, featurePool_);
     ++lineNr;
   } while (getline(dataStream, psmLine));

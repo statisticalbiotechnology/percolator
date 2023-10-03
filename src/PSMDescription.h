@@ -73,7 +73,7 @@ class PSMDescription {
   }
   
   inline void setId(const std::string& id) { id_ = id; }
-  inline std::string& getId() { return id_; }
+  inline std::string const& getId() const { return id_; }
   
   std::string& getFullPeptide() { return peptide; }
   void setPeptide(const std::string& pep_seq) { peptide=pep_seq; }

@@ -54,24 +54,24 @@ class ScoreBase {
     score_(s), label_(l), pPSM_(psm) {}
   virtual ~ScoreBase() {}
   inline void setLabel(int const l) { label_ = l; }
-  inline const int& getLabel() { return label_; }
+  inline const int& getLabel() const { return label_; }
   inline void setScore(const double& s) { score_ = s; }
-  inline const double& getScore() { return score_; }
-  inline void setPSM(const PSMDescription * p) { pPSM_ = p; }
-  inline const PSMDescription* getPSM() { return pPSM_; }
+  inline const double& getScore() const { return score_; }
+  inline void setPSM(PSMDescription * p) { pPSM_ = p; }
+  inline PSMDescription* getPSM() const { return pPSM_; }
 
 
   std::pair<double, bool> toPair() const { 
-    return pair<double, bool> (score, label > 0); 
+    return pair<double, bool> (score_, label_ > 0); 
   }
   
   inline bool isTarget() const { return label_ >= 0; }
   inline bool isDecoy() const { return label_ < 0; }
   std::string getCharge(std::string id);
+  PSMDescription* pPSM_;
 protected:
   int label_;
   double score_;
-  PSMDescription* pPSM_;
 };
 
 class ScoreHolder : public ScoreBase {
@@ -80,7 +80,7 @@ class ScoreHolder : public ScoreBase {
   
   ScoreHolder() : ScoreBase(), q(0.0), pep(0.0), p(0.0) {}
   ScoreHolder(const double s, const int l, PSMDescription* psm = NULL) :
-      ScoreBase(s, l, pPSM), q(0.0), pep(0.0), p(0.0) {}
+      ScoreBase(s, l, psm), q(0.0), pep(0.0), p(0.0) {}
   virtual ~ScoreHolder() {}
   
   void printPSM(ostream& os, bool printDecoys, bool printExpMass);
@@ -118,7 +118,7 @@ struct lexicOrderProb : public binary_function<ScoreHolder, ScoreHolder, bool> {
                             __y.getPSM()->getFullPeptideSequence().end() - 2);
     return ( ( peptCmp == 1 ) 
     || ( (peptCmp == 0) && (__x.getLabel() > __y.getLabel()) )
-    || ( (peptCmp == 0) && (__x.getLabel() == __y.getLabel()) && (__x.score > __y.score) ) );
+    || ( (peptCmp == 0) && (__x.getLabel() == __y.getLabel()) && (__x.getScore() > __y.getScore()) ) );
   }
 };
 
@@ -127,7 +127,7 @@ struct OrderScanMassCharge : public binary_function<ScoreHolder, ScoreHolder, bo
     return ( (__x.getPSM()->scan < __y.getPSM()->scan ) 
     || ( (__x.getPSM()->scan == __y.getPSM()->scan) && (__x.getPSM()->expMass < __y.getPSM()->expMass) )
     || ( (__x.getPSM()->scan == __y.getPSM()->scan) && (__x.getPSM()->expMass == __y.getPSM()->expMass) 
-       && (__x.score > __y.score) ) );
+       && (__x.getScore() > __y.getScore()) ) );
   }
 };
 
@@ -138,7 +138,7 @@ struct OrderScanMassLabelCharge : public binary_function<ScoreHolder, ScoreHolde
     || ( (__x.getPSM()->scan == __y.getPSM()->scan) && (__x.getPSM()->expMass == __y.getPSM()->expMass) 
        && (__x.getLabel() > __y.getLabel()) )
     || ( (__x.getPSM()->scan == __y.getPSM()->scan) && (__x.getPSM()->expMass == __y.getPSM()->expMass) 
-       && (__x.getLabel() == __y.getLabel()) && (__x.score > __y.score) ) );
+       && (__x.getLabel() == __y.getLabel()) && (__x.getScore() > __y.getScore()) ) );
   }
 };
 

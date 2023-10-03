@@ -309,10 +309,10 @@ void ProteinProbEstimator::setTargetandDecoysNames(Scores& peptideScores) {
   std::vector<ScoreHolder>::iterator psm = peptideScores.begin();
   for (; psm!= peptideScores.end(); ++psm) {
     // for each protein
-    std::vector<std::string>::iterator protIt = psm->pPSM->proteinIds.begin();
-    for (; protIt != psm->pPSM->proteinIds.end(); protIt++) {
-      ProteinScoreHolder::Peptide peptide(psm->pPSM->getPeptideSequence(), 
-          psm->isDecoy(), psm->p, psm->pep, psm->q, psm->score);
+    std::vector<std::string>::iterator protIt = psm->getPSM()->proteinIds.begin();
+    for (; protIt != psm->getPSM()->proteinIds.end(); protIt++) {
+      ProteinScoreHolder::Peptide peptide(psm->getPSM()->getPeptideSequence(), 
+          psm->isDecoy(), psm->p, psm->pep, psm->q, psm->getScore());
       if (proteinToIdxMap_.find(*protIt) == proteinToIdxMap_.end()) {
 	      ProteinScoreHolder newProtein(*protIt, psm->isDecoy(), peptide, ++numGroups);
 	      proteinToIdxMap_[*protIt] = proteins_.size();
@@ -351,9 +351,9 @@ void ProteinProbEstimator::addSpectralCounts(Scores& peptideScores) {
   std::vector<ScoreHolder>::iterator psm = peptideScores.begin();
   for (; psm!= peptideScores.end(); ++psm) {
     // for each protein
-    std::vector<std::string>::const_iterator protIt = psm->pPSM->proteinIds.begin();
+    std::vector<std::string>::const_iterator protIt = psm->getPSM()->proteinIds.begin();
     std::set<unsigned int> seenProteinIdxs;
-    for (; protIt != psm->pPSM->proteinIds.end(); protIt++) {
+    for (; protIt != psm->getPSM()->proteinIds.end(); protIt++) {
       if (proteinToIdxMap_.find(*protIt) != proteinToIdxMap_.end()) {
         unsigned int proteinIdx = static_cast<unsigned int>(proteinToIdxMap_[*protIt]);
         if (seenProteinIdxs.find(proteinIdx) == seenProteinIdxs.end()) {
@@ -363,7 +363,7 @@ void ProteinProbEstimator::addSpectralCounts(Scores& peptideScores) {
     }
     
     bool isUnique = (seenProteinIdxs.size() == 1);
-    unsigned int psmCount = peptideSpecCounts_[psm->pPSM->getPeptideSequence()];
+    unsigned int psmCount = peptideSpecCounts_[psm->getPSM()->getPeptideSequence()];
     std::set<unsigned int>::const_iterator protIdxIt = seenProteinIdxs.begin();
     for (; protIdxIt != seenProteinIdxs.end(); ++protIdxIt) {
       proteins_[*protIdxIt].addSpecCounts(psmCount, isUnique);

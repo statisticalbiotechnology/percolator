@@ -134,13 +134,13 @@ double FidoInterface::estimatePriors(Scores& peptideScores) {
   for (vector<ScoreHolder>::iterator psm = peptideScores.begin(); 
          psm!= peptideScores.end(); ++psm) {
     if(!psm->isDecoy()) {
-      unsigned size = static_cast<unsigned>(psm->pPSM->proteinIds.size());
+      unsigned size = static_cast<unsigned>(psm->getPSM()->proteinIds.size());
       double prior = prior_protein * size;
       double tmp_prior = prior;
       // for each protein
-      for(std::vector<std::string>::iterator protIt = psm->pPSM->proteinIds.begin(); 
-	          protIt != psm->pPSM->proteinIds.end(); protIt++) {
-	      unsigned index = static_cast<unsigned>(std::distance(psm->pPSM->proteinIds.begin(), protIt));
+      for(std::vector<std::string>::iterator protIt = psm->getPSM()->proteinIds.begin(); 
+	          protIt != psm->getPSM()->proteinIds.end(); protIt++) {
+	      unsigned index = static_cast<unsigned>(std::distance(psm->getPSM()->proteinIds.begin(), protIt));
 	      tmp_prior = (tmp_prior * prior_protein * (size - index)) / (index + 1);
 	      prior +=  pow(-1.0,(int)index) * tmp_prior;
       }

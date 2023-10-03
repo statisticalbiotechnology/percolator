@@ -22,7 +22,7 @@ void BasicBigraph::read(Scores* fullset, bool multiple_labeled_peptides) {
   vector<ScoreHolder>::iterator psm = fullset->begin();
   for (; psm!= fullset->end(); ++psm) {
     // e peptide_string
-    pepName = psm->pPSM->getFullPeptide();
+    pepName = psm->getPSM()->getFullPeptide();
     
     if ( pepName[1] == '.' ) {
       // trim off the cleavage events
@@ -46,8 +46,8 @@ void BasicBigraph::read(Scores* fullset, bool multiple_labeled_peptides) {
     pepIndex = PSMNames.lookup(pepName);
 
     // r proteins
-    std::vector<string>::const_iterator pid = psm->pPSM->proteinIds.begin();
-    for (; pid!= psm->pPSM->proteinIds.end(); ++pid) {
+    std::vector<string>::const_iterator pid = psm->getPSM()->proteinIds.begin();
+    for (; pid!= psm->getPSM()->proteinIds.end(); ++pid) {
       protName = getRidOfUnprintablesAndUnicode(*pid);
       if (proteinNames.lookup(protName) == -1) {
         add(proteinsToPSMs, proteinNames, protName);

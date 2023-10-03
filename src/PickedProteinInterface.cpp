@@ -93,7 +93,7 @@ bool PickedProteinInterface::initialize(Scores& peptideScores, const Enzyme* enz
   if (max_non_enzymatic_flanks != 2) {
     for (std::vector<ScoreHolder>::iterator shIt = peptideScores.begin(); 
              shIt != peptideScores.end(); ++shIt) {    
-      std::string peptideSequenceFlanked = shIt->pPSM->getFullPeptideSequence();
+      std::string peptideSequenceFlanked = shIt->getPSM()->getFullPeptideSequence();
       
       peptideSequenceFlanked = PSMDescription::removePTMs(peptideSequenceFlanked);
       std::string peptideSequence = PSMDescription::removeFlanks(peptideSequenceFlanked);
@@ -254,8 +254,8 @@ void PickedProteinInterface::groupProteins(Scores& peptideScores,
     
     if (peptideIt->p > maxPeptidePval_) continue;
     
-    for (std::vector<std::string>::iterator protIt = peptideIt->pPSM->proteinIds.begin(); 
-            protIt != peptideIt->pPSM->proteinIds.end(); protIt++) {
+    for (std::vector<std::string>::iterator protIt = peptideIt->getPSM()->proteinIds.begin(); 
+            protIt != peptideIt->getPSM()->proteinIds.end(); protIt++) {
       std::string proteinId = *protIt;
       
       if (fragment_map.find(proteinId) != fragment_map.end()) {
@@ -282,8 +282,8 @@ void PickedProteinInterface::groupProteins(Scores& peptideScores,
     }
     
     if (!isShared) {
-      ProteinScoreHolder::Peptide peptide(peptideIt->pPSM->getPeptideSequence(), 
-          peptideIt->isDecoy(), peptideIt->p, peptideIt->pep, peptideIt->q, peptideIt->score);
+      ProteinScoreHolder::Peptide peptide(peptideIt->getPSM()->getPeptideSequence(), 
+          peptideIt->isDecoy(), peptideIt->p, peptideIt->pep, peptideIt->q, peptideIt->getScore());
       if (proteinToIdxMap_.find(lastProteinId) == proteinToIdxMap_.end()) {
         if (proteinsInGroup.size() > 1) {
           groupProteinIds[lastProteinId] = proteinsInGroup;

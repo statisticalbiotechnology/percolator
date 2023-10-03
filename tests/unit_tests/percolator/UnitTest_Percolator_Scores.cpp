@@ -43,7 +43,7 @@ bool ScoreHolderTest::checkOrder(std::vector<ScoreHolder> const *scores, ...)
     for (std::vector<ScoreHolder>::const_iterator it = scores->begin() ;
              it != scores->end() ; ++it) {
         double score = va_arg(values, double);
-        if (it->score != score)
+        if (it->getScore() != score)
             return false;
     }
     va_end(values);
@@ -146,7 +146,7 @@ TEST_F(ScoresTest, CheckPopulating)
     for (std::vector<ScoreHolder>::const_iterator it = scores.begin() ;
             it != scores.end() ;
             it++, scanValue++) {
-        ASSERT_EQ(scanValue, it->pPSM->scan);
+        ASSERT_EQ(scanValue, it->getPSM()->scan);
     }
 }
 
