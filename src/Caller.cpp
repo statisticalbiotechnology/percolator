@@ -40,7 +40,7 @@ Caller::Caller() :
     tabOutputFN_(""), xmlOutputFN_(""), pepXMLOutputFN_(""),weightOutputFN_(""),
     psmResultFN_(""), peptideResultFN_(""), proteinResultFN_(""),
     decoyPsmResultFN_(""), decoyPeptideResultFN_(""), decoyProteinResultFN_(""),
-    analytics_(true),
+    analytics_(true), use_reset_alg_(false),
     xmlPrintDecoys_(false), xmlPrintExpMass_(true), reportUniquePeptides_(true),
     reportPepXML_(false),
     targetDecoyCompetition_(false), useMixMax_(false), inputSearchType_("auto"),
@@ -375,9 +375,17 @@ bool Caller::parseOptions(int argc, char **argv) {
       "parameter-file",
       "Read flags from a parameter file. If flags are specified on the command line as well, these will override the ones in the parameter file.",
       "filename");
+  cmd.defineOption(Option::EXPERIMENTAL_FEATURE,
+      "reset-algorithm",
+      "Run an implementation of the Percolator-RESET Algorithm.",
+      "", TRUE_IF_SET);
 
   // finally parse and handle return codes (display help etc...)
   cmd.parseArgs(argc, argv);
+
+  if (cmd.optionSet("reset-algorithm")) {
+    use_reset_alg_ = true;
+  }
 
   if (cmd.optionSet("parameter-file")) {
     cmd.parseArgsParamFile(cmd.options["parameter-file"]);

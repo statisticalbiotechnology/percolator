@@ -233,6 +233,31 @@ void ScoreHolder::printPepXML(ostream& os, map<char,float>& aaWeight, int index)
   os << "        </spectrum_query>" << endl;
 }
 
+
+int SpectrumScore::selectBestPSM() {
+  ScoreBase* pWinner = pDecoy2PSM;
+  if pTargetPSM->score > pDecoy1PSM->score {
+    if pTargetPSM->score > pDecoy2PSM->score { pWinner = pTargetPSM;}
+  } else {
+        if pDecoy1PSM->score > pDecoy2PSM->score { pWinner = pDecoy1PSM;} 
+  }
+    SpectrumScore::setScore(pWinner);
+    return label;
+  } 
+int SpectrumScore::selectTrainingPSM() {
+  ScoreBase* pWinner = pTargetPSM;
+  if (pDecoy1PSM) && (pTargetPSM->score < pDecoy1PSM->score) { pWinner = pDecoy1PSM;}
+  SpectrumScore::setScore(pWinner);
+  return label;
+} 
+int SpectrumScore::selectTestPSM() {
+  ScoreBase* pWinner = pTargetPSM;
+  if (pDecoy2PSM) && (pTargetPSM->score < pDecoy2PSM->score) { pWinner = pDecoy2PSM;}
+  SpectrumScore::setScore(pWinner);
+  return label;
+} 
+
+
 void Scores::merge(std::vector<Scores>& sv, double fdr, bool skipNormalizeScores, std::vector< std::vector<double> >& all_w) {
   scores_.clear();
   std::vector<Scores>::iterator cvBinScores = sv.begin();

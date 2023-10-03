@@ -49,22 +49,29 @@ class Scores;
 */
 class ScoreBase {
  public:
-  double score;
-  PSMDescription* pPSM;
-  int label;
-  
-  ScoreBase() : score(0.0), label(0), pPSM(NULL) {}
+  ScoreBase() : score_(0.0), label_(0), pPSM_(NULL) {}
   ScoreBase(const double s, const int l, PSMDescription* psm = NULL) :
-    score(s), label(l), pPSM(psm) {}
+    score_(s), label_(l), pPSM_(psm) {}
   virtual ~ScoreBase() {}
-  
+  inline void setLabel(int const l) { label_ = l; }
+  inline const int& getLabel() { return label_; }
+  inline void setScore(const double& s) { score_ = s; }
+  inline const double& getScore() { return score_; }
+  inline void setPSM(const PSMDescription * p) { pPSM_ = p; }
+  inline const PSMDescription* getPSM() { return pPSM_; }
+
+
   std::pair<double, bool> toPair() const { 
     return pair<double, bool> (score, label > 0); 
   }
   
-  inline bool isTarget() const { return label >= 0; }
-  inline bool isDecoy() const { return label < 0; }
+  inline bool isTarget() const { return label_ >= 0; }
+  inline bool isDecoy() const { return label_ < 0; }
   std::string getCharge(std::string id);
+protected:
+  int label_;
+  double score_;
+  PSMDescription* pPSM_;
 };
 
 class ScoreHolder : public ScoreBase {
@@ -84,8 +91,8 @@ struct lessThanBaseName
 {
     inline bool operator() (const ScoreHolder& struct1, const ScoreHolder& struct2)
     {
-        std::string id1 = struct1.pPSM->getId();
-        std::string id2 = struct2.pPSM->getId();
+        std::string id1 = struct1.getPSM()->getId();
+        std::string id2 = struct2.getPSM()->getId();
         return (id1 < id2);
     }
 };
@@ -105,59 +112,59 @@ struct lexicOrderProb : public binary_function<ScoreHolder, ScoreHolder, bool> {
   }
   
   bool operator()(const ScoreHolder& __x, const ScoreHolder& __y) const {
-    int peptCmp = compStrIt(__x.pPSM->getFullPeptideSequence().begin() + 2, 
-                            __x.pPSM->getFullPeptideSequence().end() - 2, 
-                            __y.pPSM->getFullPeptideSequence().begin() + 2, 
-                            __y.pPSM->getFullPeptideSequence().end() - 2);
+    int peptCmp = compStrIt(__x.getPSM()->getFullPeptideSequence().begin() + 2, 
+                            __x.getPSM()->getFullPeptideSequence().end() - 2, 
+                            __y.getPSM()->getFullPeptideSequence().begin() + 2, 
+                            __y.getPSM()->getFullPeptideSequence().end() - 2);
     return ( ( peptCmp == 1 ) 
-    || ( (peptCmp == 0) && (__x.label > __y.label) )
-    || ( (peptCmp == 0) && (__x.label == __y.label) && (__x.score > __y.score) ) );
+    || ( (peptCmp == 0) && (__x.getLabel() > __y.getLabel()) )
+    || ( (peptCmp == 0) && (__x.getLabel() == __y.getLabel()) && (__x.score > __y.score) ) );
   }
 };
 
 struct OrderScanMassCharge : public binary_function<ScoreHolder, ScoreHolder, bool> {
   bool operator()(const ScoreHolder& __x, const ScoreHolder& __y) const {
-    return ( (__x.pPSM->scan < __y.pPSM->scan ) 
-    || ( (__x.pPSM->scan == __y.pPSM->scan) && (__x.pPSM->expMass < __y.pPSM->expMass) )
-    || ( (__x.pPSM->scan == __y.pPSM->scan) && (__x.pPSM->expMass == __y.pPSM->expMass) 
+    return ( (__x.getPSM()->scan < __y.getPSM()->scan ) 
+    || ( (__x.getPSM()->scan == __y.getPSM()->scan) && (__x.getPSM()->expMass < __y.getPSM()->expMass) )
+    || ( (__x.getPSM()->scan == __y.getPSM()->scan) && (__x.getPSM()->expMass == __y.getPSM()->expMass) 
        && (__x.score > __y.score) ) );
   }
 };
 
 struct OrderScanMassLabelCharge : public binary_function<ScoreHolder, ScoreHolder, bool> {
   bool operator()(const ScoreHolder& __x, const ScoreHolder& __y) const {
-    return ( (__x.pPSM->scan < __y.pPSM->scan ) 
-    || ( (__x.pPSM->scan == __y.pPSM->scan) && (__x.pPSM->expMass < __y.pPSM->expMass) )
-    || ( (__x.pPSM->scan == __y.pPSM->scan) && (__x.pPSM->expMass == __y.pPSM->expMass) 
-       && (__x.label > __y.label) )
-    || ( (__x.pPSM->scan == __y.pPSM->scan) && (__x.pPSM->expMass == __y.pPSM->expMass) 
-       && (__x.label == __y.label) && (__x.score > __y.score) ) );
+    return ( (__x.getPSM()->scan < __y.getPSM()->scan ) 
+    || ( (__x.getPSM()->scan == __y.getPSM()->scan) && (__x.getPSM()->expMass < __y.getPSM()->expMass) )
+    || ( (__x.getPSM()->scan == __y.getPSM()->scan) && (__x.getPSM()->expMass == __y.getPSM()->expMass) 
+       && (__x.getLabel() > __y.getLabel()) )
+    || ( (__x.getPSM()->scan == __y.getPSM()->scan) && (__x.getPSM()->expMass == __y.getPSM()->expMass) 
+       && (__x.getLabel() == __y.getLabel()) && (__x.score > __y.score) ) );
   }
 };
 
 struct OrderScanLabel : public binary_function<ScoreHolder, ScoreHolder, bool> {
   bool operator()(const ScoreHolder& __x, const ScoreHolder& __y) const {
-    return ( (__x.pPSM->scan < __y.pPSM->scan ) 
-    || ( (__x.pPSM->scan == __y.pPSM->scan) && (__x.label > __y.label) ) );
+    return ( (__x.getPSM()->scan < __y.getPSM()->scan ) 
+    || ( (__x.getPSM()->scan == __y.getPSM()->scan) && (__x.getLabel() > __y.getLabel()) ) );
   }
 };
 
 
 struct UniqueScanMassCharge : public binary_function<ScoreHolder, ScoreHolder, bool> {
   bool operator()(const ScoreHolder& __x, const ScoreHolder& __y) const {
-    return (__x.pPSM->scan == __y.pPSM->scan) && (__x.pPSM->expMass == __y.pPSM->expMass);
+    return (__x.getPSM()->scan == __y.getPSM()->scan) && (__x.getPSM()->expMass == __y.getPSM()->expMass);
   }
 };
 
 struct UniqueScanMassLabelCharge : public binary_function<ScoreHolder, ScoreHolder, bool> {
   bool operator()(const ScoreHolder& __x, const ScoreHolder& __y) const {
-    return (__x.pPSM->scan == __y.pPSM->scan) && (__x.label == __y.label) && (__x.pPSM->expMass == __y.pPSM->expMass);
+    return (__x.getPSM()->scan == __y.getPSM()->scan) && (__x.getLabel() == __y.getLabel()) && (__x.getPSM()->expMass == __y.getPSM()->expMass);
   }
 };
 
 struct UniqueScanLabel : public binary_function<ScoreHolder, ScoreHolder, bool> {
   bool operator()(const ScoreHolder& __x, const ScoreHolder& __y) const {
-    return (__x.pPSM->scan == __y.pPSM->scan) && (__x.label == __y.label);
+    return (__x.getPSM()->scan == __y.getPSM()->scan) && (__x.getLabel() == __y.getLabel());
   }
 };
 
@@ -183,18 +190,10 @@ class SpectrumScore : public ScoreHolder {
     SpectrumScore(ScoreBase* pTarg, ScoreBase* pDec1, ScoreBase* pDec2) : ScoreHolder(), pTargetPSM(pTarg), pDecoy1PSM(pDec1), pDecoy2PSM(pDec2) {}; 
     SpectrumScore() : ScoreHolder(), pTargetPSM(NULL), pDecoy1PSM(NULL), pDecoy2PSM(NULL) {};
     virtual ~SpectrumScore() {};
-    int selectBestPSM() {
-      ScoreBase* pWinner = pDecoy2PSM;
-      if pTargetPSM->score > pDecoy1PSM->score {
-        if pTargetPSM->score > pDecoy2PSM->score { pWinner = pTargetPSM;}
-      } else {
-        if pDecoy1PSM->score > pDecoy2PSM->score { pWinner = pDecoy1PSM;} 
-      }
-      pPSM = pWinner->pPSM;
-      score = pWinner->score;
-      label = pWinner->label;
-      return label;
-    } 
+    void inline setScore(const ScoreBase* pScore) {pPSM_ = pScore->getPSM(); score_ = pScore->getScore(); label_ = pScore->getLabel();}
+    int selectBestPSM();
+    int selectTrainingPSM();
+    int selectTestPSM();
   protected:
     ScoreBase* pTargetPSM;    
     ScoreBase* pDecoy1PSM;    

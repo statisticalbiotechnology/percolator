@@ -18,7 +18,7 @@
 #include <assert.h>
 
 #include "Globals.h"
-#include "PSMsOfSpectrum.h"
+#include "PSMDescription.h"
 
 PSMDescription::PSMDescription() :
     features(NULL), expMass(0.), calcMass(0.), retentionTime_(nan("")), scan(0),

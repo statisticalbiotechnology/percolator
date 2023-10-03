@@ -619,7 +619,7 @@ void XMLInterface::writePepXML_PSMs(Scores& fullset, double selectionFdr_, std::
 
   int index = 1;
   for (std::vector<ScoreHolder>::iterator sh = fullset.begin();sh != fullset.end(); ++sh) {
-    std::string id = sh->pPSM->getId();
+    std::string id = sh->getPSM()->getId();
     auto baseName = id.substr(0, id.find('.'));
     if (baseName != pepXMLBaseName) {
       /*  Start of a new msms run*/

@@ -81,7 +81,7 @@ class SetHandler {
   
   // Reads in tab delimited stream and returns a SanityCheck object based on
   // the presence of default weights. Returns 0 on error, 1 on success.
-  int readTab(istream& dataStream, SanityCheck*& pCheck);
+  int readTab(istream& dataStream, SanityCheck*& pCheck, bool twoDecoySets = false);
   int readAndScoreTab(istream& dataStream, 
     std::vector<double>& rawWeights, Scores& allScores, SanityCheck*& pCheck);
   void addQueueToSets(std::priority_queue<PSMDescriptionPriority>& subsetPSMs,

@@ -236,7 +236,7 @@ int DataSet::readPsm(const std::string& line, const unsigned int lineNr,
     proteins.swap(myPsm->proteinIds); // shrink to fit
   }
 
-  if (label == -1) {
+  if (label <=-1) {
     for (auto const& proteinId: myPsm->proteinIds) { 
       bool startsWithDecoyPrefix = (proteinId.rfind(decoyPrefix, 0) == 0);
       if (!startsWithDecoyPrefix && VERB > 1 && !TabFileValidator::decoyWarningTripped) {
@@ -252,6 +252,7 @@ void DataSet::registerPsm(PSMDescription* myPsm) {
   switch (label_) {
     case 1: { break; };
     case -1: { break; };
+    case -2: { break; };
     default:  { throw MyException("ERROR : Reading PSM, class DataSet has not been initiated\
     to neither target nor decoy label\n");}
   }
