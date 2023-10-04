@@ -234,26 +234,26 @@ void ScoreHolder::printPepXML(ostream& os, map<char,float>& aaWeight, int index)
 }
 
 
-int SpectrumScore::selectBestPSM() {
+int PeptidepairScore::selectBestPSM() {
   ScoreBase* pWinner = pDecoy2PSM;
   if (pTargetPSM->getScore() > pDecoy1PSM->getScore()) {
     if (pTargetPSM->getScore() > pDecoy2PSM->getScore()) { pWinner = pTargetPSM;}
   } else {
         if (pDecoy1PSM->getScore() > pDecoy2PSM->getScore()) { pWinner = pDecoy1PSM;} 
   }
-    SpectrumScore::setScore(pWinner);
+    PeptidepairScore::setScore(pWinner);
     return label_;
   } 
-int SpectrumScore::selectTrainingPSM() {
+int PeptidepairScore::selectTrainingPSM() {
   ScoreBase* pWinner = pTargetPSM;
   if ((pDecoy1PSM) && (pTargetPSM->getScore() < pDecoy1PSM->getScore())) { pWinner = pDecoy1PSM;}
-  SpectrumScore::setScore(pWinner);
+  PeptidepairScore::setScore(pWinner);
   return label_;
 } 
-int SpectrumScore::selectTestPSM() {
+int PeptidepairScore::selectTestPSM() {
   ScoreBase* pWinner = pTargetPSM;
   if ((pDecoy2PSM) && (pTargetPSM->getScore() < pDecoy2PSM->getScore())) { pWinner = pDecoy2PSM;}
-  SpectrumScore::setScore(pWinner);
+  PeptidepairScore::setScore(pWinner);
   return label_;
 } 
 

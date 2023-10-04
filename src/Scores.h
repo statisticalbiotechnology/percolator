@@ -182,14 +182,14 @@ inline string getRidOfUnprintablesAndUnicode(string inpString) {
 
 // Super class for implementing the Reset algorithm
 // The class holds multiple Scoreholders. 
-class SpectrumScore : public ScoreHolder {
+class PeptidepairScore : public ScoreHolder {
   public:
     /**
      * @brief Super class for implementing the Reset algorithm. The class holds multiple ScoreBase:s.
      */
-    SpectrumScore(ScoreBase* pTarg, ScoreBase* pDec1, ScoreBase* pDec2) : ScoreHolder(), pTargetPSM(pTarg), pDecoy1PSM(pDec1), pDecoy2PSM(pDec2) {}; 
-    SpectrumScore() : ScoreHolder(), pTargetPSM(NULL), pDecoy1PSM(NULL), pDecoy2PSM(NULL) {};
-    virtual ~SpectrumScore() {};
+    PeptidepairScore(ScoreBase* pTarg, ScoreBase* pDec1, ScoreBase* pDec2) : ScoreHolder(), pTargetPSM(pTarg), pDecoy1PSM(pDec1), pDecoy2PSM(pDec2) {}; 
+    PeptidepairScore() : ScoreHolder(), pTargetPSM(NULL), pDecoy1PSM(NULL), pDecoy2PSM(NULL) {};
+    virtual ~PeptidepairScore() {};
     void inline setScore(const ScoreBase* pScore) {pPSM_ = pScore->getPSM(); score_ = pScore->getScore(); label_ = pScore->getLabel();}
     int selectBestPSM();
     int selectTrainingPSM();
