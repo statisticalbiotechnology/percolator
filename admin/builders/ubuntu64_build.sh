@@ -68,6 +68,12 @@ else
   sudo apt-get -y install xsdcxx;
 fi
 
+# Install some packacges needed for the build process
+sudo apt-get -y install gawk;
+if [[ ! -z `echo -e "$(lsb_release -r)" | gawk '($2>="22.04"){print $2}'` ]]; then
+  sudo apt-get -y install libcurl4-openssl-dev;
+fi
+
 # issue with XercesC in Ubuntu 16.04: https://github.com/percolator/percolator/issues/188
 if [[ ! -z `echo -e "$(lsb_release -r)" | gawk '($2>="18.04"){print $2}'` ]]; then
   if [[ ! -d ${ubuntu_xerces}/lib ]]; then
