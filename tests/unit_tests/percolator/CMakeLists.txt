@@ -2,9 +2,9 @@
 if(NOT WITHOUT_GTEST)
   # If GTest is not installed, build and install a private copy.
   find_package(GTest)
-  if(GTEST_FOUND)
+  if(GTest_FOUND)
     message(STATUS "Using installed GoogleTest at: ${GTEST_INCLUDE_DIRS}")
-  else(GTEST_FOUND)
+  else(GTest_FOUND)
     message(STATUS "GoogleTest package not found; proceeding to download it.")
     configure_file(GTestExtProject.cmake.in googletest-download/CMakeLists.txt)
     execute_process(COMMAND ${CMAKE_COMMAND} -G "${CMAKE_GENERATOR}" .
@@ -31,7 +31,7 @@ if(NOT WITHOUT_GTEST)
     set(GTEST_INCLUDE_DIRS "${gtest_SOURCE_DIR}/include")
     set(GTEST_BOTH_LIBRARIES gtest gtestmain)
     message(STATUS "GoogleTest has been installed succesfully: ${GTEST_INCLUDE_DIRS}.")
-  endif(GTEST_FOUND)
+  endif(GTest_FOUND)
 
   # Linking and building unit tests
   find_package(Boost ${BOOST_MIN_VERSION} REQUIRED)

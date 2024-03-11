@@ -6,17 +6,6 @@
 #include "Scores.h"
 #include "CompositionSorter.h"
 
-// based on the djb2 algorithm
-struct DJB2Hash {
-    size_t operator()(const std::string& s) const {
-        unsigned long hash = 5381;
-        for (char c : s) {
-            hash = ((hash << 5) + hash) + c;
-        }
-        return hash;
-    }
-};
-
 
 std::string CompositionSorter::generateCompositionSignature(const std::string& peptide) {
     std::map<std::string, int> counts;
@@ -27,10 +16,8 @@ std::string CompositionSorter::generateCompositionSignature(const std::string& p
             while (j < peptide.size() && peptide[j] != ']') {
                 ++j;
             }
-
             // Extract the modification
             counts[peptide.substr(i, j - i + 1)]++;
-
             // Skip the modification
             i = j;
         } else {
@@ -53,7 +40,7 @@ int CompositionSorter::addPSMs(std::vector<ScoreBase>& scores) {
         std::string signature = generateCompositionSignature(peptide);
         if (scr.getPSM()->isTarget()) {
             targetCompositionToPeptides_[signature][peptide].push_back(scr);
-        } else {}
+        } else {
             decoyCompositionToPeptides_[signature][peptide].push_back(scr);
         }
     }
