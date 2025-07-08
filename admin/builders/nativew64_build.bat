@@ -73,7 +73,16 @@ if not exist "%BOOST_ROOT%" (
   %ZIP_EXE% x "%INSTALL_DIR%\boost.7z" -o"%INSTALL_DIR%" -aoa -xr!doc > NUL
   cd /D "%BOOST_ROOT%"
   call bootstrap
+  if not exist b2.exe (
+      echo ERROR: b2.exe not found after Boost bootstrap. Printing bootstrap.log:
+      if exist bootstrap.log type bootstrap.log
+      exit /b 1
+  )
   b2 address-model=64 threading=multi -j4 --with-system --with-filesystem --with-serialization -d0
+  if errorlevel 1 (
+      echo ERROR: b2 build failed.
+      exit /b 1
+  )
 )
 set BOOST_LIB=%BOOST_ROOT%\stage\lib
 set BOOST_INCLUDEDIR=%BOOST_ROOT%
