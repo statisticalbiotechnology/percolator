@@ -51,7 +51,7 @@ jobs:
       run: cd ${{ github.workspace }}/build/percolator && sudo make install && make test-install
 
   build-windows:
-    runs-on: windows-2019
+    runs-on: windows-2022
     defaults:
       run:
         shell: cmd
