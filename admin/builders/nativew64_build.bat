@@ -72,7 +72,7 @@ if not exist "%BOOST_ROOT%" (
   call :downloadfile %BOOST_URL% %INSTALL_DIR%\boost.7z
   %ZIP_EXE% x "%INSTALL_DIR%\boost.7z" -o"%INSTALL_DIR%" -aoa -xr!doc > NUL
   cd /D "%BOOST_ROOT%"
-  call bootstrap
+  call bootstrap msvc
   if not exist b2.exe (
       echo ERROR: b2.exe not found after Boost bootstrap. Printing bootstrap.log:
       if exist bootstrap.log type bootstrap.log
