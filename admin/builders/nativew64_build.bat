@@ -72,7 +72,7 @@ if not exist "%BOOST_ROOT%" (
   call :downloadfile %BOOST_URL% %INSTALL_DIR%\boost.7z
   %ZIP_EXE% x "%INSTALL_DIR%\boost.7z" -o"%INSTALL_DIR%" -aoa -xr!doc > NUL
   cd /D "%BOOST_ROOT%"
-  call bootstrap
+  call bootstrap msvc
   b2 address-model=64 threading=multi -j4 --with-system --with-filesystem --with-serialization -d0
 )
 set BOOST_LIB=%BOOST_ROOT%\stage\lib
