@@ -1,12 +1,11 @@
+# Find a suitable Python interpreter
+find_package(Python3 COMPONENTS Interpreter REQUIRED)
+
 # SETTING VARIBALES THAT WILL BE OF USE IN THE TEST SCRIPTS
 set(pathToBinaries ${CMAKE_INSTALL_PREFIX}/bin)
 set(pathToData ${CMAKE_SOURCE_DIR}/data)
 set(pathToOutputData ${CMAKE_BINARY_DIR}/data)
-if(XML_SUPPORT)
-  set(xmlSupport True)
-else(XML_SUPPORT)
-  set(xmlSupport False)
-endif(XML_SUPPORT)
+set(xmlSupport False)
 
 # STORE NEWLY SET VARIABLES IN *.h.cmake FILES
 file(GLOB_RECURSE configurefiles RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/*.cmake )
@@ -28,6 +27,6 @@ set(system_tests_dir ${CMAKE_CURRENT_BINARY_DIR})
 set(system_tests_commands)
 foreach(current_system_test ${tests})
   list(APPEND system_tests_commands
-              COMMAND python ${system_tests_dir}/${current_system_test}.py)
+              COMMAND  ${Python3_EXECUTABLE} ${system_tests_dir}/${current_system_test}.py)
 endforeach(current_system_test)
 add_custom_target(test-install ${system_tests_commands} VERBATIM)

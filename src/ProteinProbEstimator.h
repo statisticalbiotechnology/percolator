@@ -146,9 +146,6 @@ class ProteinProbEstimator {
   /** MAYUS method for estimation of Protein FDR **/
   void computeFDR();
   
-  /** write the list of proteins to the output file **/
-  void writeOutputToXML(string xmlOutputFN, bool outputDecoys);
-
   /** Return the number of proteins whose q value is less or equal than the threshold given**/
   unsigned getQvaluesBelowLevel(double level);
   unsigned getQvaluesBelowLevelDecoy(double level);
@@ -161,9 +158,6 @@ class ProteinProbEstimator {
   
   /** print copyright of the author**/
   virtual string printCopyright() = 0;
-  
-  /** printing custom parameters to xml **/
-  virtual std::ostream& printParametersXML(std::ostream &os) = 0;
   
   /**some getters and setters**/
   static inline void setCalcProteinLevelProb(bool on) { calcProteinLevelProb = on; }

@@ -65,7 +65,6 @@ class PickedProteinInterface : public ProteinProbEstimator {
   void run() {}
   void computeProbabilities(const std::string& fname = "");
   
-  std::ostream& printParametersXML(std::ostream &os);
   string printCopyright();
 
  private:

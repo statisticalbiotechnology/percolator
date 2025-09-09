@@ -59,91 +59,30 @@ if [ -z "$TRAVIS" ] && [ -z "$CI" ]; then
     sudo apt-get -y install g++ make cmake rpm fakeroot;
 fi
 
-cd ${src_dir}
-
+# cd ${src_dir}
 # read all urls and file names from a centralized kb file
-source percolator/admin/builders/_urls_and_file_names_.sh
+# source percolator/admin/builders/_urls_and_file_names_.sh
 
 mkdir -p $build_dir
 cd ${build_dir}
 
-# download and patch xsd
-if [[ $(lsb_release -a) == *"14.04"* ]]; then
-    if [ ! -d ${ubuntu_xsd} ]; then
-        echo "Installing XSD"
-        wget --quiet ${ubuntu_xsd_url}
-        tar xjf ${ubuntu_xsd}.tar.bz2
-        sed -i 's/setg/this->setg/g' ${ubuntu_xsd}/libxsd/xsd/cxx/zc-istream.txx
-        sed -i 's/ push_back/ this->push_back/g' ${ubuntu_xsd}/libxsd/xsd/cxx/tree/parsing.txx
-        sed -i 's/ push_back/ this->push_back/g' ${ubuntu_xsd}/libxsd/xsd/cxx/tree/stream-extraction.hxx
-    fi
-else
-    sudo apt-get -y install xsdcxx;
-fi
-
-# issue with XercesC in Ubuntu 16.04: https://github.com/percolator/percolator/issues/188
-if [[ ! -z `echo -e "$(lsb_release -r)" | gawk '($2>="18.04"){print $2}'` ]]; then
-    if [[ ! -d ${ubuntu_xerces}/lib ]]; then
-        echo "Installing XercesC"
-        # download, compile and link xerces
-        wget --no-check-certificate --quiet ${ubuntu_xerces_url}
-        tar xzf ${ubuntu_xerces}.tar.gz
-        cd ${ubuntu_xerces}/
-        ./configure --prefix=${build_dir}/${ubuntu_xerces} --disable-netaccessor-curl --disable-transcoder-icu > ../xercesc_config.log 2>&1
-        make -j 4 > ../xercesc_make.log 2>&1
-        make install > ../xercesc_install.log 2>&1
-    fi
-else
-    sudo apt-get -y install libxerces-c-dev
-fi
-
-# end of section to remove
-sudo apt-get -y install libboost-dev libboost-filesystem-dev xsdcxx;
-sudo apt-get -y install libboost-system-dev libboost-thread-dev libsqlite3-dev libtokyocabinet-dev zlib1g-dev libbz2-dev libtirpc-dev;
-
-#------------------------------------------------------------------------
-mkdir -p $build_dir/percolator-noxml $build_dir/percolator $build_dir/converters;
-
 ######percolator########
-#-----cmake-----
-cd $build_dir/percolator-noxml;
-echo "cmake percolator-noxml.....";
-(set -x;
-    cmake -DTARGET_ARCH=amd64 -DCMAKE_BUILD_TYPE=${build_type} -DCMAKE_INSTALL_PREFIX=/usr -DXML_SUPPORT=OFF $src_dir/percolator;
-)
-#-----make------
-echo "make percolator (this will take few minutes).....";
-make -j 4;
-make -j 4 package;
 
 #-----cmake-----
+mkdir -p $build_dir/percolator;
 cd $build_dir/percolator;
 echo "cmake percolator.....";
 (set -x;
-    cmake -DTARGET_ARCH=amd64 -DCMAKE_BUILD_TYPE=${build_type} -DCMAKE_INSTALL_PREFIX=/usr -DGOOGLE_TEST=1 -DCMAKE_PREFIX_PATH="${build_dir}/${ubuntu_xerces}/;${build_dir}/${ubuntu_xsd}/" -DXML_SUPPORT=ON $src_dir/percolator;
+    cmake -DTARGET_ARCH=amd64 -DCMAKE_BUILD_TYPE=${build_type} -DCMAKE_INSTALL_PREFIX=/usr -DGOOGLE_TEST=1  $src_dir/percolator;
 )
 #-----make------
 echo "make percolator (this will take few minutes).....";
 make -j 4;
+make test;
 make -j 4 package;
 
-#######converters########
-cd $build_dir/converters
-#-----cmake-----
-echo "cmake converters.....";
-(set -x;
-    cmake -DTARGET_ARCH=amd64 -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_BUILD_TYPE=${build_type} -DCMAKE_PREFIX_PATH="${build_dir}/${ubuntu_xerces}/;${build_dir}/${ubuntu_xsd}/" -DSERIALIZE="TokyoCabinet" $src_dir/percolator/src/converters;
-)
-#-----make------
-echo "make converters (this will take few minutes).....";
-
-make -j 4;
-make -j 4 package;
-
-
-###########################
 
 echo "Finished buildscript execution";
 echo "in build directory ${build_dir}";
 
-cp -v $build_dir/{percolator-noxml,percolator,converters}/*.deb ${release_dir};
+cp -v $build_dir/percolator/percolator*.deb ${release_dir};

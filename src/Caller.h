@@ -39,7 +39,6 @@ limitations under the License.
 #include "SanityCheck.h"
 #include "Scores.h"
 #include "SetHandler.h"
-#include "XMLInterface.h"
 
 #define NO_BOOST_DATE_TIME_INLINE
 #include <algorithm>
@@ -75,15 +74,13 @@ class Caller {
   bool readStdIn_;
   std::string inputFN_;
   std::vector<std::string> inputFNs_;
-  bool xmlSchemaValidation_;
   std::string protEstimatorDecoyPrefix_;
 
   // file output parameters
-  std::string tabOutputFN_, xmlOutputFN_, pepXMLOutputFN_;
+  std::string tabOutputFN_, pepXMLOutputFN_;
   std::string weightOutputFN_;
   std::string psmResultFN_, peptideResultFN_, proteinResultFN_;
   std::string decoyPsmResultFN_, decoyPeptideResultFN_, decoyProteinResultFN_;
-  bool xmlPrintDecoys_, xmlPrintExpMass_;
   bool outputRT_ = false;
 
   // report level parameters
@@ -108,10 +105,9 @@ class Caller {
 
   std::istream& getDataInStream(std::ifstream& fileStream);
   bool loadAndNormalizeData(std::istream& dataStream,
-                            XMLInterface& xmlInterface,
                             SetHandler& setHandler,
                             Scores& allScores);
-  void calcAndOutputResult(Scores& allScores, XMLInterface& xmlInterface);
+  void calcAndOutputResult(Scores& allScores);
 
   void calculatePSMProb(Scores& allScores, bool uniquePeptideRun);
   void writeResults(Scores& allScores, bool unique, bool writeOutput);
