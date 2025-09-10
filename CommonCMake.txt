@@ -85,11 +85,12 @@ IF(MINGW OR WIN32)
     set(CMAKE_LIBRARY_PATH ${CMAKE_LIBRARY_PATH} ${CMAKE_SOURCE_DIR}/lib/lib)
     add_definitions(-D_WIN32)
 ELSE(MINGW OR WIN32)
-    IF(NOT APPLE)
-      set(CMAKE_FIND_LIBRARY_SUFFIXES .a ${CMAKE_FIND_LIBRARY_SUFFIXES})
-    ENDIF(NOT APPLE)
-    set(CMAKE_INCLUDE_PATH /usr/include ${CMAKE_INCLUDE_PATH})
-    set(CMAKE_LIBRARY_PATH /usr/lib /usr/lib64 ${CMAKE_LIBRARY_PATH})
+    # On Linux you may optionally prefer static libs if STATIC is ON.
+    if(UNIX AND NOT APPLE AND STATIC)
+      list(PREPEND CMAKE_FIND_LIBRARY_SUFFIXES .a)
+    endif()
+    list(APPEND CMAKE_INCLUDE_PATH /usr/include)
+    list(APPEND CMAKE_LIBRARY_PATH /usr/lib /usr/lib64)
 ENDIF(MINGW OR WIN32)
 
 IF(MINGW)
@@ -133,17 +134,20 @@ else(APPLE)
   set(Boost_USE_MULTITHREADED OFF)
 endif()
 set(Boost_NO_BOOST_CMAKE ON CACHE BOOL "" FORCE)
+set(Boost_USE_DEBUG_LIBS OFF)
+set(Boost_USE_RELEASE_LIBS ON)
 
 # Prefer the config package if available
-find_package(Boost 1.70 MODULE REQUIRED COMPONENTS filesystem system)
+find_package(Boost 1.70 MODULE REQUIRED COMPONENTS filesystem)
 
 # Link with imported targets
 if(TARGET Boost::filesystem)
-  link_libraries(Boost::filesystem Boost::system)
+  link_libraries(Boost::filesystem)
 else()
   include_directories(${Boost_INCLUDE_DIRS})
   link_libraries(${Boost_LIBRARIES})
 endif()
+add_definitions(-DBOOST_ALL_NO_LIB)      # or the narrower -DBOOST_SYSTEM_NO_LIB
 
 ###############################################################################
 # SET COMPILER OPTIONS
