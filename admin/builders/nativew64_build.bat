@@ -70,12 +70,12 @@ set BOOST_ROOT=%INSTALL_DIR%\%BOOST_BASE%
 if not exist "%BOOST_ROOT%" (
   echo Downloading and installing Boost, this can take a few minutes...
   call :downloadfile %BOOST_URL% %INSTALL_DIR%\boost.7z
-  %ZIP_EXE% x "%INSTALL_DIR%\boost.7z" -o"%INSTALL_DIR%" -aoa -xr!doc > NUL
+  %ZIP_EXE% x "%INSTALL_DIR%\boost.7z" -o"%INSTALL_DIR%" -aoa -xr!doc >NUL 2>&1
   cd /D "%BOOST_ROOT%"
   call bootstrap
   :: Build and INSTALL only needed libs into a clean prefix
   set BOOST_INSTALL=%BOOST_ROOT%_install
-  b2 address-model=64 threading=multi link=static runtime-link=shared -j4 ^
+  b2 -q address-model=64 threading=multi link=static runtime-link=shared -j4 ^
    --with-system --with-filesystem --with-serialization ^
    --prefix="%BOOST_INSTALL%" install
 )
