@@ -39,15 +39,14 @@ elif [[ -f ${HOME}/bin/brew ]]
     echo "[ Package manager ] : Homebrew "
     package_manager=$HOME/bin/brew
     boost_install_options="boost"
-    other_packages="cmake lbzip2 pbzip2 lzlib llvm libomp"
+    other_packages="lbzip2 pbzip2 lzlib llvm libomp"
 elif [[ -f /usr/local/bin/brew || -f /opt/homebrew/bin/brew ]]  
   then
     echo "[ Package manager ] : Homebrew "
     package_manager="brew"
     ${package_manager} update || true # brew.rb raises an error on the vagrant box, just ignore it
     boost_install_options="boost"
-    other_packages="cmake lbzip2 pbzip2 lzlib llvm libomp"
-
+    other_packages="lbzip2 pbzip2 lzlib llvm libomp"
 else
     package_manager_installed=false
 fi
@@ -59,6 +58,12 @@ if [ "$package_manager_installed" == false ]
   echo "  Homebrew: http://brew.sh/ "
   echo "  MacPorts: http://www.macports.org/install.php"
   exit 1
+fi
+
+if command -v cmake >/dev/null 2>&1; then
+  echo "CMake found, stay with installation"
+else
+  other_packages="$other_packages cmake"
 fi
 
 if [[ -z ${build_dir} ]]; then
@@ -91,15 +96,6 @@ cd ${src_dir}
 source ./percolator/admin/builders/_urls_and_file_names_.sh
 mkdir -p ${build_dir}
 cd ${build_dir}
-
-#export CC=/opt/homebrew/opt/llvm/bin/clang
-#export CXX=/opt/homebrew/opt/llvm/bin/clang++
-#export SDKROOT=$(xcrun --sdk macosx --show-sdk-path)
-#export SYSROOT_FLAGS="--sysroot=$SDKROOT -isystem$SDKROOT/usr/include -isystem$SDKROOT/System/Library/Frameworks"
-#export HOMEBREW_LLVM_INCLUDE="/opt/homebrew/opt/llvm/include/c++/v1"
-#export CXXFLAGS="-isystem $HOMEBREW_LLVM_INCLUDE $SYSROOT_FLAGS"
-#export LDFLAGS="-L/opt/homebrew/opt/llvm/lib/c++ -stdlib=libc++ -framework CoreFoundation -framework CoreServices -lcurl"
-
 
 function build_component() {
     local name="$1"
