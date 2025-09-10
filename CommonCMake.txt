@@ -119,8 +119,11 @@ endif()
 set(Boost_USE_STATIC_LIBS   ON)
 set(Boost_USE_MULTITHREADED OFF)
 
-set(BOOST_MIN_VERSION "1.70.0")
+# Prefer the config package if available
+find_package(Boost 1.70 REQUIRED CONFIG COMPONENTS filesystem system)
 
+# Link with imported targets
+link_libraries(Boost::filesystem Boost::system)
 
 ###############################################################################
 # SET COMPILER OPTIONS

@@ -92,7 +92,6 @@ source ./percolator/admin/builders/_urls_and_file_names_.sh
 mkdir -p ${build_dir}
 cd ${build_dir}
 
-$package_manager install xerces-c xsd
 export CC=/opt/homebrew/opt/llvm/bin/clang
 export CXX=/opt/homebrew/opt/llvm/bin/clang++
 export SDKROOT=$(xcrun --sdk macosx --show-sdk-path)
