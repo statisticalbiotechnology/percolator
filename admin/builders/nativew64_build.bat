@@ -145,7 +145,12 @@ if not exist "%BUILD_DIR%" (md "%BUILD_DIR%")
 if not exist "%BUILD_DIR%\percolator" (md "%BUILD_DIR%\percolator")
 cd /D "%BUILD_DIR%\percolator"
 echo cmake percolator.....
-%CMAKE_EXE% -G "Visual Studio %MSVC_VER%" -A x64 -DCMAKE_BUILD_TYPE=%BUILD_TYPE% -DGOOGLE_TEST=1 "%SRC_DIR%\percolator"
+%CMAKE_EXE% -G "Visual Studio %MSVC_VER%" -A x64 -DCMAKE_BUILD_TYPE=%BUILD_TYPE% -DGOOGLE_TEST=1 ^
+  -DBoost_NO_BOOST_CMAKE=ON ^
+  -DBOOST_ROOT="%BOOST_ROOT%" ^
+  -DBOOST_INCLUDEDIR="%BOOST_INCLUDEDIR%" ^
+  -DBOOST_LIBRARYDIR="%BOOST_LIBRARYDIR%" ^
+  "%SRC_DIR%\percolator"
 echo build percolator (this will take a few minutes).....
 msbuild PACKAGE.vcxproj /p:Configuration=%BUILD_TYPE% /m
 
