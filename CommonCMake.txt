@@ -115,6 +115,10 @@ else(MINGW OR WIN32 OR APPLE)
   OPTION(STATIC "build static binaries. This is mainly intended for the win32-package and the MACOSX-bundle." OFF )
 endif()
 
+if(POLICY CMP0074)
+  cmake_policy(SET CMP0074 NEW)
+endif()
+
 # Link Boost static and single threaded
 set(Boost_USE_STATIC_LIBS   ON)
 set(Boost_USE_MULTITHREADED OFF)

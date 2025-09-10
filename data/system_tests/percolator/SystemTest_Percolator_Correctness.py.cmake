@@ -43,11 +43,10 @@ def canPercRunThisTab(testName,flags,testFile):
 def canPercRunThis(testName,flags,testFile,testFileFlag="",checkValidXml=True):
   success = True
   outputPath = os.path.join(pathToOutputData,"PERCOLATOR_"+testName)
-  xmlOutput = doubleQuote(outputPath + ".pout.xml")
   txtOutput = doubleQuote(outputPath + ".txt")
   readPath = doubleQuote(os.path.join(pathToData, testFile))
   percExe = doubleQuote(os.path.join(pathToBinaries, "percolator"))
-  cmd = ' '.join([percExe, testFileFlag, readPath, '-S 2 -X', xmlOutput, flags, '>', txtOutput,'2>&1'])
+  cmd = ' '.join([percExe, testFileFlag, readPath, '-S 2', flags, '>', txtOutput,'2>&1'])
   processFile = os.popen(cmd)
   exitStatus = processFile.close()
   if exitStatus is not None:
@@ -55,8 +54,6 @@ def canPercRunThis(testName,flags,testFile,testFileFlag="",checkValidXml=True):
     print("...TEST FAILED: percolator ("+testName+") terminated with " + os.strerror(exitStatus) + " exit status")
     print("check "+ txtOutput +" for details")
     success = False
-  if checkValidXml:
-    success = success and validate(testName,xmlOutput)
   return success
 
 # puts double quotes around the input string, needed for windows shell

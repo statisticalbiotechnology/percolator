@@ -92,13 +92,13 @@ source ./percolator/admin/builders/_urls_and_file_names_.sh
 mkdir -p ${build_dir}
 cd ${build_dir}
 
-export CC=/opt/homebrew/opt/llvm/bin/clang
-export CXX=/opt/homebrew/opt/llvm/bin/clang++
-export SDKROOT=$(xcrun --sdk macosx --show-sdk-path)
-export SYSROOT_FLAGS="--sysroot=$SDKROOT -isystem$SDKROOT/usr/include -isystem$SDKROOT/System/Library/Frameworks"
-export HOMEBREW_LLVM_INCLUDE="/opt/homebrew/opt/llvm/include/c++/v1"
-export CXXFLAGS="-isystem $HOMEBREW_LLVM_INCLUDE $SYSROOT_FLAGS"
-export LDFLAGS="-L/opt/homebrew/opt/llvm/lib/c++ -stdlib=libc++ -framework CoreFoundation -framework CoreServices -lcurl"
+#export CC=/opt/homebrew/opt/llvm/bin/clang
+#export CXX=/opt/homebrew/opt/llvm/bin/clang++
+#export SDKROOT=$(xcrun --sdk macosx --show-sdk-path)
+#export SYSROOT_FLAGS="--sysroot=$SDKROOT -isystem$SDKROOT/usr/include -isystem$SDKROOT/System/Library/Frameworks"
+#export HOMEBREW_LLVM_INCLUDE="/opt/homebrew/opt/llvm/include/c++/v1"
+#export CXXFLAGS="-isystem $HOMEBREW_LLVM_INCLUDE $SYSROOT_FLAGS"
+#export LDFLAGS="-L/opt/homebrew/opt/llvm/lib/c++ -stdlib=libc++ -framework CoreFoundation -framework CoreServices -lcurl"
 
 
 function build_component() {
@@ -110,8 +110,6 @@ function build_component() {
     pushd "${build_dir}/${name}" > /dev/null
 
     cmake \
-      -DCMAKE_C_COMPILER="$CC" \
-      -DCMAKE_CXX_COMPILER="$CXX" \
       -DCMAKE_BUILD_TYPE=Release \
       -DCMAKE_INSTALL_PREFIX=/usr/local \
       -DCMAKE_CXX_FLAGS="$CXXFLAGS" \
