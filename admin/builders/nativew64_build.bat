@@ -72,11 +72,11 @@ if not exist "%BOOST_ROOT%" (
   call :downloadfile %BOOST_URL% %INSTALL_DIR%\boost.7z
   %ZIP_EXE% x "%INSTALL_DIR%\boost.7z" -o"%INSTALL_DIR%" -aoa -xr!doc >NUL 2>&1
   cd /D "%BOOST_ROOT%"
-  call bootstrap
+  call bootstrap >NUL 2>&1
   :: Build and INSTALL only needed libs into a clean prefix
   set BOOST_INSTALL=%BOOST_ROOT%_install
-  b2 -q address-model=64 threading=multi link=static runtime-link=shared -j4 ^
-   --with-system --with-filesystem --with-serialization ^
+  b2 -q -d0 address-model=64 threading=multi link=static runtime-link=shared -j4 ^
+   --with-system --with-filesystem ^
    --prefix="%BOOST_INSTALL%" install
 )
 set BOOST_LIB=%BOOST_ROOT%\stage\lib
