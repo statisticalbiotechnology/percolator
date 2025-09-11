@@ -13,6 +13,24 @@ if(APPLE AND OPENMP_FOUND)
   include_directories(${OpenMP_CXX_INCLUDE_DIRS})
 endif(APPLE AND OPENMP_FOUND)
 
+
+if(POLICY CMP0074)
+  cmake_policy(SET CMP0074 NEW)
+endif()
+if(POLICY CMP0167)
+  cmake_policy(SET CMP0167 OLD)
+endif()
+
+# Link Boost static and single threaded
+#if(APPLE)
+#  set(Boost_USE_STATIC_LIBS OFF)
+#  set(Boost_USE_MULTITHREADED ON)
+#else(APPLE)
+  set(Boost_USE_STATIC_LIBS   ON)
+  set(Boost_USE_MULTITHREADED OFF)
+#endif()
+set(Boost_NO_BOOST_CMAKE ON CACHE BOOL "" FORCE)
+
 # Boost header libraries only for async io header library (asio.hpp)
 find_package(Boost ${BOOST_MIN_VERSION} COMPONENTS filesystem system REQUIRED)
 add_definitions(-DBOOST_SYSTEM_NO_DEPRECATED)
@@ -20,6 +38,12 @@ add_definitions(-DBOOST_ERROR_CODE_HEADER_ONLY)
 if(WIN32)
   add_definitions(-DBOOST_ALL_NO_LIB) # disable autolinking in boost
 endif(WIN32)
+if(MSVC)
+  add_definitions (/MP /D _CRT_SECURE_NO_WARNINGS /D _CRT_NONSTDC_NO_DEPRECATE)
+  # CMake automatically configures VS to use multi threading,
+  # if boost would use single threading, the auto-linking process of boost would fail.
+  set(Boost_USE_MULTITHREADED ON)
+endif(MSVC)
 include_directories(${Boost_INCLUDE_DIRS})
 
 #########################################

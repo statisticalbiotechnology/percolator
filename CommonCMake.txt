@@ -34,13 +34,6 @@ macro(load_config_files location)
 endmacro()
 
 # useful macro
-macro(my_find_program progname)
-  find_program(${progname}_EXECUTABLE ${progname})
-  if(NOT ${progname}_EXECUTABLE)
-    message(FATAL_ERROR  "${progname} not found" )
-  endif(NOT ${progname}_EXECUTABLE)
-endmacro(my_find_program)
-
 function(get_arch TARGET_ARCH)
   # Detect machine architecture, on UNIX:
   if(UNIX AND NOT APPLE AND NOT DEFINED ${TARGET_ARCH})
@@ -93,61 +86,18 @@ ELSE(MINGW OR WIN32)
     list(APPEND CMAKE_LIBRARY_PATH /usr/lib /usr/lib64)
 ENDIF(MINGW OR WIN32)
 
-IF(MINGW)
-  IF(CMAKE_SIZEOF_VOID_P EQUAL 8)
-    SET(MINGW64 1)
-    SET(MINGW_PATH /usr/x86_64-w64-mingw32/sys-root/mingw/)
-    SET(MINGW_PACK_NAME win64)
-  ELSE()
-    SET(MINGW32 1)
-    SET(MINGW_PATH /usr/i686-w64-mingw32/sys-root/mingw/)
-    SET(MINGW_PACK_NAME win32)
-  ENDIF()
-ENDIF(MINGW)
-
 set(PACKAGE_VERSION "${CPACK_PACKAGE_VERSION_MAJOR}.${CPACK_PACKAGE_VERSION_MINOR}.${CPACK_PACKAGE_VERSION_PATCH}")
 
 #STATIC/DYNAMIC LIBRARY INCLUSION
-#if(APPLE)
-#  set(CMAKE_FIND_LIBRARY_SUFFIXES .a ${CMAKE_FIND_LIBRARY_SUFFIXES})
-#endif()
+if(APPLE)
+  set(CMAKE_FIND_LIBRARY_SUFFIXES .a ${CMAKE_FIND_LIBRARY_SUFFIXES})
+endif()
 if(MINGW OR WIN32 OR APPLE)
   OPTION(BUILD_SHARED_LIBS "build static binaries." OFF)
   OPTION(STATIC "build static binaries. This is mainly intended for the win32-package and the MACOSX-bundle." ON )
 else(MINGW OR WIN32 OR APPLE)
   OPTION(STATIC "build static binaries. This is mainly intended for the win32-package and the MACOSX-bundle." OFF )
 endif()
-
-if(POLICY CMP0074)
-  cmake_policy(SET CMP0074 NEW)
-endif()
-if(POLICY CMP0167)
-  cmake_policy(SET CMP0167 OLD)
-endif()
-
-# Link Boost static and single threaded
-if(APPLE)
-  set(Boost_USE_STATIC_LIBS OFF)
-  set(Boost_USE_MULTITHREADED ON)
-else(APPLE)
-  set(Boost_USE_STATIC_LIBS   ON)
-  set(Boost_USE_MULTITHREADED OFF)
-endif()
-set(Boost_NO_BOOST_CMAKE ON CACHE BOOL "" FORCE)
-set(Boost_USE_DEBUG_LIBS OFF)
-set(Boost_USE_RELEASE_LIBS ON)
-
-# Prefer the config package if available
-find_package(Boost 1.70 MODULE REQUIRED COMPONENTS filesystem)
-
-# Link with imported targets
-if(TARGET Boost::filesystem)
-  link_libraries(Boost::filesystem)
-else()
-  include_directories(${Boost_INCLUDE_DIRS})
-  link_libraries(${Boost_LIBRARIES})
-endif()
-add_definitions(-DBOOST_ALL_NO_LIB)      # or the narrower -DBOOST_SYSTEM_NO_LIB
 
 ###############################################################################
 # SET COMPILER OPTIONS
@@ -175,12 +125,6 @@ if(PROFILING AND UNIX)
   set(PROFILING_COMMON_FLAGS -Wno-unused-result -Wno-overflow -Wall -g -pg -fprofile-arcs -ftest-coverage)
 endif()
 
-if(MSVC)
-  add_definitions (/MP /D _CRT_SECURE_NO_WARNINGS /D _CRT_NONSTDC_NO_DEPRECATE)
-  # CMake automatically configures VS to use multi threading,
-  # if boost would use single threading, the auto-linking process of boost would fail.
-  set(Boost_USE_MULTITHREADED ON)
-endif(MSVC)
 
 if((NOT APPLE) OR (NOT CRUX AND APPLE AND ${CMAKE_MAJOR_VERSION}.${CMAKE_MINOR_VERSION} VERSION_GREATER 3.8))
   find_package(OpenMP)
