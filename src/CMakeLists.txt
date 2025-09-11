@@ -55,7 +55,11 @@ endif()
 set(Boost_NO_BOOST_CMAKE ON CACHE BOOL "" FORCE)
 
 # Require the components you actually use
-find_package(Boost ${BOOST_MIN_VERSION} COMPONENTS filesystem system REQUIRED)
+if(APPLE)
+  find_package(Boost ${BOOST_MIN_VERSION} COMPONENTS filesystem REQUIRED)
+else()
+  find_package(Boost ${BOOST_MIN_VERSION} COMPONENTS filesystem system REQUIRED)
+endif()
 
 add_definitions(-DBOOST_SYSTEM_NO_DEPRECATED)
 add_definitions(-DBOOST_ERROR_CODE_HEADER_ONLY)
@@ -65,8 +69,10 @@ if(WIN32)
 endif()
 
 include_directories(${Boost_INCLUDE_DIRS})
-
-set(PERCOLATOR_THIRD_PARTY Boost::filesystem Boost::system)
+set(COMMON_LIBRARIES Boost::filesystem)
+if(NOT APPLE)
+  list(APPEND COMMON_LIBRARIES Boost::system)
+endif()
 
 if(MSVC)
   add_definitions (/MP /D _CRT_SECURE_NO_WARNINGS /D _CRT_NONSTDC_NO_DEPRECATE)
@@ -83,7 +89,7 @@ if (MSVC AND USE_MSVC_STATIC_RUNTIME)
 endif()
 
 
-
+find_package(Threads REQUIRED)
 
 #########################################
 # COMPILE BLAS
@@ -143,6 +149,9 @@ add_library(perclibrary STATIC BaseSpline.cpp MassHandler.cpp ResultHolder.cpp P
 								  ProteinProbEstimator.cpp ProteinFDRestimator.cpp ScoreHolder.cpp Scores.cpp PseudoRandom.cpp Set.cpp SqtSanityCheck.cpp ssl.cpp PackedVector.cpp
 								  PackedMatrix.cpp Logger.cpp MyException.cpp ProteinScoreHolder.cpp PickedProteinInterface.cpp FeatureMemoryPool.cpp Timer.cpp TmpDir.cpp ValidateTabFile.cpp Vector.cpp)
 
+if(OpenMP_CXX_FOUND)
+  target_link_libraries(perclibrary PUBLIC OpenMP::OpenMP_CXX)
+endif()
 
 ###############################################################################
 # COMPILE INTERNAL LIBRARIES
@@ -177,21 +186,20 @@ ELSE(CRUX)
   endif()
 
   # SET LIBRARIES FOR PERCOLATOR
-  set(COMMON_LIBRARIES perclibrary ${DBLAS_LIBRARIES} picked_protein ${CURL_LIBRARIES} ${RPC_LIBRARIES} Threads::Threads)
-  set(COMMON_LIBRARIES ${COMMON_LIBRARIES} )
+  list(APPEND COMMON_LIBRARIES perclibrary ${DBLAS_LIBRARIES} picked_protein ${CURL_LIBRARIES} ${RPC_LIBRARIES} Threads::Threads)
   if(NOT MSVC)
     if(NOT APPLE)
-      set(COMMON_LIBRARIES ${COMMON_LIBRARIES} stdc++)
+      list(APPEND COMMON_LIBRARIES stdc++)
     endif(NOT APPLE)
   endif(NOT MSVC)
   if (OpenMP_CXX_FOUND)
-      set(COMMON_LIBRARIES ${COMMON_LIBRARIES} OpenMP::OpenMP_CXX)
+      list(APPEND COMMON_LIBRARIES OpenMP::OpenMP_CXX)
   endif()
 
   if(COVERAGE)
-    target_link_libraries(percolator PRIVATE -fprofile-arcs ${COMMON_LIBRARIES} ${PERCOLATOR_THIRD_PARTY})
+    target_link_libraries(percolator PRIVATE -fprofile-arcs ${COMMON_LIBRARIES})
   else(COVERAGE)
-    target_link_libraries(percolator PRIVATE ${COMMON_LIBRARIES} ${PERCOLATOR_THIRD_PARTY})
+    target_link_libraries(percolator PRIVATE ${COMMON_LIBRARIES})
   endif(COVERAGE)
 
   # INSTALL PERCOLATOR
