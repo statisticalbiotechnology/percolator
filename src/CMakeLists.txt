@@ -9,6 +9,7 @@ include_directories(${CMAKE_CURRENT_BINARY_DIR})
 
 MESSAGE( STATUS "Checking packages:" )
 
+set(COMMON_LIBRARIES "")
 find_package(OpenMP)
 # Help AppleClang find Homebrew's libomp if not auto-detected
 if(APPLE AND NOT OpenMP_CXX_FOUND)
@@ -24,6 +25,10 @@ if(APPLE AND NOT OpenMP_CXX_FOUND)
     find_package(OpenMP)
   endif()
 endif()
+if (OpenMP_CXX_FOUND)
+    list(APPEND COMMON_LIBRARIES OpenMP::OpenMP_CXX)
+endif()
+
 
 
 if(POLICY CMP0074)
@@ -69,7 +74,7 @@ if(WIN32)
 endif()
 
 include_directories(${Boost_INCLUDE_DIRS})
-set(COMMON_LIBRARIES Boost::filesystem)
+list(APPEND COMMON_LIBRARIES Boost::filesystem)
 if(NOT APPLE)
   list(APPEND COMMON_LIBRARIES Boost::system)
 endif()
@@ -88,8 +93,9 @@ if (MSVC AND USE_MSVC_STATIC_RUNTIME)
   set(Boost_USE_STATIC_RUNTIME ON)  # match Boost to the CRT choice
 endif()
 
-
 find_package(Threads REQUIRED)
+list(APPEND COMMON_LIBRARIES Threads::Threads)
+
 
 #########################################
 # COMPILE BLAS
@@ -139,6 +145,14 @@ string(REGEX REPLACE
 file(WRITE "${EIGEN_MATHFUNCTIONS_FILE}" "${MATHFUNCS_CONTENT_PATCHED}")
 ### End patch
 
+if (MSVC)
+  add_compile_definitions(
+    _HAS_STD_BYTE=0     # disables std::byte so 'byte' in Windows headers is unambiguous
+    NOMINMAX            # avoid macro min/max conflicts
+    _WIN32_WINNT=0x0601 # silence that SDK warning (Windows 7 or higher)
+  )
+endif()
+
 #############################################################################
 # COMPILE PERCOLATOR
 ###############################################################################
@@ -150,7 +164,9 @@ add_library(perclibrary STATIC BaseSpline.cpp MassHandler.cpp ResultHolder.cpp P
 								  PackedMatrix.cpp Logger.cpp MyException.cpp ProteinScoreHolder.cpp PickedProteinInterface.cpp FeatureMemoryPool.cpp Timer.cpp TmpDir.cpp ValidateTabFile.cpp Vector.cpp)
 
 if(OpenMP_CXX_FOUND)
-  target_link_libraries(perclibrary PUBLIC OpenMP::OpenMP_CXX)
+  target_link_libraries(perclibrary PUBLIC ${COMMON_LIBRARIES} OpenMP::OpenMP_CXX)
+else()
+  target_link_libraries(perclibrary PUBLIC ${COMMON_LIBRARIES} EIGEN_DONT_PARALLELIZE)
 endif()
 
 ###############################################################################
@@ -186,15 +202,12 @@ ELSE(CRUX)
   endif()
 
   # SET LIBRARIES FOR PERCOLATOR
-  list(APPEND COMMON_LIBRARIES perclibrary ${DBLAS_LIBRARIES} picked_protein ${CURL_LIBRARIES} ${RPC_LIBRARIES} Threads::Threads)
+  list(APPEND COMMON_LIBRARIES perclibrary ${DBLAS_LIBRARIES} picked_protein ${CURL_LIBRARIES} ${RPC_LIBRARIES})
   if(NOT MSVC)
     if(NOT APPLE)
       list(APPEND COMMON_LIBRARIES stdc++)
     endif(NOT APPLE)
   endif(NOT MSVC)
-  if (OpenMP_CXX_FOUND)
-      list(APPEND COMMON_LIBRARIES OpenMP::OpenMP_CXX)
-  endif()
 
   if(COVERAGE)
     target_link_libraries(percolator PRIVATE -fprofile-arcs ${COMMON_LIBRARIES})
