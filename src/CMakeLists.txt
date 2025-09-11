@@ -9,42 +9,81 @@ include_directories(${CMAKE_CURRENT_BINARY_DIR})
 
 MESSAGE( STATUS "Checking packages:" )
 
-if(APPLE AND OPENMP_FOUND)
-  include_directories(${OpenMP_CXX_INCLUDE_DIRS})
-endif(APPLE AND OPENMP_FOUND)
+find_package(OpenMP)
+# Help AppleClang find Homebrew's libomp if not auto-detected
+if(APPLE AND NOT OpenMP_CXX_FOUND)
+  # Common Homebrew prefix on Apple Silicon
+  set(_HOMEBREW_OMP_ROOT "/opt/homebrew/opt/libomp")
+  if (EXISTS "${_HOMEBREW_OMP_ROOT}/include" AND EXISTS "${_HOMEBREW_OMP_ROOT}/lib")
+    # Hint include/lib to CMake's OpenMP finder
+    set(OpenMP_CXX_FLAGS "-Xpreprocessor -fopenmp" CACHE STRING "" FORCE)
+    set(OpenMP_CXX_LIB_NAMES "omp" CACHE STRING "" FORCE)
+    set(OpenMP_omp_LIBRARY "${_HOMEBREW_OMP_ROOT}/lib/libomp.dylib" CACHE FILEPATH "" FORCE)
+    include_directories("${_HOMEBREW_OMP_ROOT}/include")
+    # Retry discovery
+    find_package(OpenMP)
+  endif()
+endif()
 
 
 if(POLICY CMP0074)
   cmake_policy(SET CMP0074 NEW)
 endif()
+# Make find_package honor UPPER-CASE <PKG>_ROOT vars like BOOST_ROOT (CMake 3.30+)
+if(POLICY CMP0144)
+  cmake_policy(SET CMP0144 NEW)
+endif()
 if(POLICY CMP0167)
   cmake_policy(SET CMP0167 OLD)
 endif()
 
-# Link Boost static and single threaded
-#if(APPLE)
-#  set(Boost_USE_STATIC_LIBS OFF)
-#  set(Boost_USE_MULTITHREADED ON)
-#else(APPLE)
-  set(Boost_USE_STATIC_LIBS   ON)
-  set(Boost_USE_MULTITHREADED OFF)
-#endif()
+
+# --- Boost configuration (platform-aware) ---
+# We mostly want static, but Homebrew on macOS ships only dynamic libs.
+if(APPLE)
+  set(Boost_USE_STATIC_LIBS OFF)
+  set(Boost_USE_MULTITHREADED ON)
+elseif(MSVC)
+  set(Boost_USE_STATIC_LIBS ON)
+  set(Boost_USE_MULTITHREADED ON)
+else()
+  set(Boost_USE_STATIC_LIBS ON)
+  set(Boost_USE_MULTITHREADED ON)
+endif()
+
+# Prefer Boost's classic FindBoost over boost-cmake configs
 set(Boost_NO_BOOST_CMAKE ON CACHE BOOL "" FORCE)
 
-# Boost header libraries only for async io header library (asio.hpp)
+# Require the components you actually use
 find_package(Boost ${BOOST_MIN_VERSION} COMPONENTS filesystem system REQUIRED)
+
 add_definitions(-DBOOST_SYSTEM_NO_DEPRECATED)
 add_definitions(-DBOOST_ERROR_CODE_HEADER_ONLY)
+
 if(WIN32)
   add_definitions(-DBOOST_ALL_NO_LIB) # disable autolinking in boost
-endif(WIN32)
+endif()
+
+include_directories(${Boost_INCLUDE_DIRS})
+
+set(PERCOLATOR_THIRD_PARTY Boost::filesystem Boost::system)
+
 if(MSVC)
   add_definitions (/MP /D _CRT_SECURE_NO_WARNINGS /D _CRT_NONSTDC_NO_DEPRECATE)
-  # CMake automatically configures VS to use multi threading,
-  # if boost would use single threading, the auto-linking process of boost would fail.
-  set(Boost_USE_MULTITHREADED ON)
 endif(MSVC)
-include_directories(${Boost_INCLUDE_DIRS})
+option(USE_MSVC_STATIC_RUNTIME "Link MSVC runtime statically (/MT)" ON)
+if (MSVC AND USE_MSVC_STATIC_RUNTIME)
+  foreach(flag_var CMAKE_C_FLAGS CMAKE_C_FLAGS_DEBUG CMAKE_C_FLAGS_RELEASE
+                   CMAKE_CXX_FLAGS CMAKE_CXX_FLAGS_DEBUG CMAKE_CXX_FLAGS_RELEASE)
+    if(${flag_var} MATCHES "/MD")
+      string(REPLACE "/MD" "/MT" ${flag_var} "${${flag_var}}")
+    endif()
+  endforeach()
+  set(Boost_USE_STATIC_RUNTIME ON)  # match Boost to the CRT choice
+endif()
+
+
+
 
 #########################################
 # COMPILE BLAS
@@ -127,13 +166,6 @@ if(CRUX)
 ELSE(CRUX)
   add_executable(percolator main.cpp)
 
-  if(APPLE)
-    set_property(TARGET percolator PROPERTY LINK_SEARCH_START_STATIC FALSE)
-    set_property(TARGET percolator PROPERTY LINK_SEARCH_END_STATIC TRUE)
-  elseif(MINGW)
-    set_target_properties(percolator PROPERTIES LINK_FLAGS "-Wl,-Bdynamic -static-libgcc")
-  endif()
-
   if(PROFILING AND UNIX)
     set_target_properties(percolator PROPERTIES COMPILE_FLAGS -pg LINK_FLAGS -pg)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 ${PROFILING_COMMON_FLAGS}")
@@ -145,18 +177,21 @@ ELSE(CRUX)
   endif()
 
   # SET LIBRARIES FOR PERCOLATOR
-  set(COMMON_LIBRARIES perclibrary ${DBLAS_LIBRARIES} picked_protein ${XERCESC_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT} ${CURL_LIBRARIES} ${RPC_LIBRARIES})
+  set(COMMON_LIBRARIES perclibrary ${DBLAS_LIBRARIES} picked_protein ${CURL_LIBRARIES} ${RPC_LIBRARIES} Threads::Threads)
+  set(COMMON_LIBRARIES ${COMMON_LIBRARIES} )
   if(NOT MSVC)
-    if(APPLE)
-      set(COMMON_LIBRARIES ${COMMON_LIBRARIES} ${OpenMP_CXX_LIBRARIES})
-    else(APPLE)
+    if(NOT APPLE)
       set(COMMON_LIBRARIES ${COMMON_LIBRARIES} stdc++)
-    endif(APPLE)
+    endif(NOT APPLE)
   endif(NOT MSVC)
+  if (OpenMP_CXX_FOUND)
+      set(COMMON_LIBRARIES ${COMMON_LIBRARIES} OpenMP::OpenMP_CXX)
+  endif()
+
   if(COVERAGE)
-    target_link_libraries(percolator -fprofile-arcs ${COMMON_LIBRARIES} ${Boost_LIBRARIES})
+    target_link_libraries(percolator PRIVATE -fprofile-arcs ${COMMON_LIBRARIES} ${PERCOLATOR_THIRD_PARTY})
   else(COVERAGE)
-    target_link_libraries(percolator ${COMMON_LIBRARIES} ${Boost_LIBRARIES})
+    target_link_libraries(percolator PRIVATE ${COMMON_LIBRARIES} ${PERCOLATOR_THIRD_PARTY})
   endif(COVERAGE)
 
   # INSTALL PERCOLATOR

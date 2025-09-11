@@ -124,12 +124,3 @@ endif()
 if(PROFILING AND UNIX)
   set(PROFILING_COMMON_FLAGS -Wno-unused-result -Wno-overflow -Wall -g -pg -fprofile-arcs -ftest-coverage)
 endif()
-
-
-if((NOT APPLE) OR (NOT CRUX AND APPLE AND ${CMAKE_MAJOR_VERSION}.${CMAKE_MINOR_VERSION} VERSION_GREATER 3.8))
-  find_package(OpenMP)
-  if (OPENMP_FOUND)
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
-  endif(OPENMP_FOUND)
-endif()
