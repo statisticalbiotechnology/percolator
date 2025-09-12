@@ -7,12 +7,6 @@
 #include <memory>   // for std::unique_ptr, std::make_unique
 #include <algorithm> // for std::min, std::max
 
-#ifdef _MSC_VER
-  #define NOMINMAX
-  #include <float.h>
-  #define _finite(x) _finite(x)
-#endif
-
 #include <Eigen/Dense>
 #include <Eigen/Sparse> 
 
