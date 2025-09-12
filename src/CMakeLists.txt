@@ -32,11 +32,21 @@ endif()
 
 
 # Make find_package honor UPPER-CASE <PKG>_ROOT vars like BOOST_ROOT (CMake 3.30+)
-if(POLICY CMP0074) cmake_policy(SET CMP0074 NEW) endif()
-if(POLICY CMP0144) cmake_policy(SET CMP0144 NEW) endif()
-if(POLICY CMP0167) cmake_policy(SET CMP0167 OLD) endif()
-if(POLICY CMP0169) cmake_policy(SET CMP0169 NEW) endif()
-if(POLICY CMP0177) cmake_policy(SET CMP0177 NEW) endif()
+if(POLICY CMP0074)
+  cmake_policy(SET CMP0074 NEW)
+endif()
+if(POLICY CMP0144)
+  cmake_policy(SET CMP0144 NEW)
+endif()
+if(POLICY CMP0167)
+  cmake_policy(SET CMP0167 OLD)
+endif()
+if(POLICY CMP0169)
+  cmake_policy(SET CMP0169 NEW)
+endif()
+if(POLICY CMP0177)
+  cmake_policy(SET CMP0177 NEW)
+endif()
 
 
 
