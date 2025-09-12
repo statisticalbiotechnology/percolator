@@ -11,206 +11,39 @@
 #include <Eigen/Dense>
 #include <Eigen/Sparse> 
 #include <chrono>
+#include "MonotoneRegressor.h"
 #include "IsotonicPEP.h"
 
 
-/**
- * Perform standard PAVA (pool-adjacent-violators) to enforce a non-decreasing sequence
- * on the input 'values'.  
- * Here we extended the method to also merge block if average is outside 
- * the range [min_value, max_value] 
- *
- * Each final "block" is repeated block.count times in the output.
- *
- * Typically used in 1D for y-values only.
- */
-std::vector<double> PavaRegression::pavaNonDecreasingRanged(
-    const std::vector<double>& values,
-    const double min_value,
-    const double max_value
-) const
-{
-    const int n = static_cast<int>(values.size());
-    if (n == 0) {
-        return {};
-    }
+// Forward-defined concrete classes
+class PAVARegressor :: public MonotoneRegressor;
+class ISplineTRRRegressor :: public MonotoneRegressor;
 
-    // We'll store blocks on a stack
-    struct MergeBlock {
-        double sum;
-        int    count;
-        double avg;
-    };
-
-    std::vector<MergeBlock> stack;
-    stack.reserve(n);
-
-    // 1. Left to right
-    for (int i = 0; i < n; ++i) {
-        MergeBlock newBlock { values[i], 1, values[i] };
-        stack.push_back(newBlock);
-
-        // 2. Merge while there's a violation of non-decreasing
-        while (stack.size() > 1) {
-            auto &top    = stack.back();
-            auto &secTop = stack[stack.size() - 2];
-            double mergedSum   = secTop.sum + top.sum;
-            int    mergedCount = secTop.count + top.count;
-            double mergedAvg   = mergedSum / mergedCount;
-
-            // if (( secTop.avg > top.avg) || ( mergedAvg < min_value ) || ( mergedAvg > max_value )) {
-            if ( secTop.avg > top.avg) {
-                stack.pop_back();
-                stack.pop_back();
-                stack.push_back({ mergedSum, mergedCount, mergedAvg });
-            } else {
-                break;
-            }
-        }
-    }
-
-    // 3. Expand final solution
-    std::vector<double> result;
-    result.reserve(n); // approximate; actual size = sum(counts)
-
-    for (auto &b : stack) {
-        double val = std::max( std::min(b.avg, max_value), min_value);
-        for (int c = 0; c < b.count; ++c) {
-            result.push_back(val);
-        }
-    }
-    return result;
+std::unique_ptr<MonotoneRegressor> make_regressor(RegressorType type, const MonotoneParams& params) {
+  std::unique_ptr<MonotoneRegressor> ptr;
+  switch (type) {
+    case RegressorType::PAVA:
+      ptr = std::unique_ptr<MonotoneRegressor>(new PAVARegressor());
+      break;
+    case RegressorType::ISPLINE_TRR:
+      ptr = std::unique_ptr<MonotoneRegressor>(new ISplineTRRRegressor());
+      break;
+  }
+  ptr->set_params(params);
+  return ptr;
 }
 
-double IsplineRegression::cubic_ispline(double x, double left, double right) const {
-    if (x < left) return 0.0;
-    if (x >= right) return 1.0;
-    double u = (x - left) / (right - left);
-    return 3 * u * u - 2 * u * u * u;
-}
 
-namespace util {
-    template <typename T>
-    const T& clamp(const T& v, const T& lo, const T& hi) {
-        return (v < lo) ? lo : (hi < v) ? hi : v;
-    }
-}
-
-std::vector<double> IsplineRegression::fit_y(const std::vector<double>& y, double min_val, double max_val) const {
-    std::vector<double> x(y.size());
-    std::iota(x.begin(), x.end(), 0.0);
-    return fit_xy(x, y, min_val, max_val);
-}
-
-IsplineRegression::BinnedData IsplineRegression::bin_data(
-    const std::vector<double>& x, const std::vector<double>& y, int max_bins) const
-{
-    size_t n = x.size();
-    if (n == 0 || max_bins <= 0) return {{}, {}, {}};
-
-    std::vector<double> x_binned, y_binned, weights;
-
-    double target_bin_size = static_cast<double>(n) / max_bins;
-    double next_bin_threshold = target_bin_size;
-
-    size_t bin_start = 0;
-    for (size_t i = 0; i < n; ++i) {
-        double bin_progress = static_cast<double>(i + 1);  // since i is inclusive
-        if (bin_progress >= next_bin_threshold || i == n - 1) {
-            size_t bin_end = i + 1;  // exclusive
-            size_t bin_size = bin_end - bin_start;
-
-            double x_sum = std::accumulate(x.begin() + bin_start, x.begin() + bin_end, 0.0);
-            double y_sum = std::accumulate(y.begin() + bin_start, y.begin() + bin_end, 0.0);
-
-            double x_avg = x_sum / bin_size;
-            double y_avg = y_sum / bin_size;
-
-            if (VERB > 4) {
-                std::cerr << "Creating bin from " << bin_start << " to " << i
-                          << ", x_avg: " << x_avg << ", y_avg: " << y_avg << "\n";
-            }
-
-            x_binned.push_back(x_avg);
-            y_binned.push_back(y_avg);
-            weights.push_back(static_cast<double>(bin_size));
-
-            bin_start = bin_end;
-            next_bin_threshold += target_bin_size;
-        }
-    }
-
-    return {x_binned, y_binned, weights};
-}
-
-std::vector<double> IsplineRegression::compute_adaptive_knots(const std::vector<double>& x, const std::vector<double>& /* y */, int num_knots) const {
-    
-    std::vector<double> knots;
-    knots.push_back(x.front());
-    for (int i = 1; i < num_knots; ++i) {
-        double q = 1.0 - std::pow(1.0 - static_cast<double>(i) / num_knots, skew_factor_);
-        size_t idx = static_cast<size_t>(q * (x.size() - 1));
-        knots.push_back(x[idx]);
-    }
-    knots.push_back(x.back());
-    if (VERB > 3) {
-        std::cerr << "Knots: ";
-        for (const auto& k : knots) std::cerr << k << " ";
-        std::cerr << "\n";
-    }
-    return knots;
-}
-
-Eigen::VectorXd IsplineRegression::fit_spline(const BinnedData& data, const std::vector<double>& knots, double lambda) const {
-    int n = data.x.size(), k = knots.size();
-    Eigen::MatrixXd X(n, k);
-    for (int i = 0; i < n; ++i)
-        for (int j = 0; j < k - 1; ++j)
-            X(i, j) = cubic_ispline(data.x[i], knots[j], knots[j + 1]);
-    X.col(k - 1).setOnes();
-
-    Eigen::VectorXd y = Eigen::Map<const Eigen::VectorXd>(data.y.data(), n);
-    Eigen::VectorXd w = Eigen::Map<const Eigen::VectorXd>(data.weights.data(), n);
-    Eigen::VectorXd coeffs = (X.transpose() * w.asDiagonal() * X + lambda * Eigen::MatrixXd::Identity(k, k)).ldlt().solve(X.transpose() * w.asDiagonal() * y);
-
-    if (VERB > 3) std::cerr << "Spline coefficients: " << coeffs.transpose() << "\n";
-
-    return coeffs;
-}
-
-std::vector<double> IsplineRegression::fit_xy(const std::vector<double>& x, const std::vector<double>& y, double min_val, double max_val) const {
-    if (x.empty() || y.empty()) {
-        if (VERB > 0) std::cerr << "[WARNING] fit_xy called with empty input.\n";
-        return {};
-    }
-    assert(x.size() == y.size());
-    auto data = bin_data(x, y, num_bins_);
-    // auto data = adaptive_bin(x, y, num_bins);
-    auto knots = compute_adaptive_knots(data.x, data.y, std::min(50, (int)std::sqrt(data.x.size())));
-
-    Eigen::VectorXd coeffs = fit_spline(data, knots, lambda_);
-
-    std::vector<double> result(x.size());
-    for (size_t i = 0; i < x.size(); ++i) {
-        double pred = coeffs.tail(1)(0);
-        for (size_t j = 0; j < knots.size() - 1; ++j)
-            pred += coeffs(j) * cubic_ispline(x[i], knots[j], knots[j + 1]);
-        result[i] = util::clamp(pred, min_val, max_val);
-    }
-
-    return PavaRegression().fit_xy(x, result, min_val, max_val);
-}
 
 InferPEP::InferPEP(bool use_ispline)
 {
     if (use_ispline) {
-        regressor_ptr_ = std::make_unique<IsplineRegression>();
-//        regressor_ptr_ = std::make_unique<IsplineRegression>();
+        regressor_ptr_ = make_regressor(RegressorType::ISPLINE_TRR, MonotoneParams());
         if (VERB > 1) {
             std::cerr << "Performing isotonic regression using I-Splines" << std::endl;
         }                
     } else {
-        regressor_ptr_ = std::make_unique<PavaRegression>();
+        regressor_ptr_ = make_regressor(RegressorType::PAVA, MonotoneParams());
         if (VERB > 1) {
             std::cerr << "Performing isotonic regression using PAVA" << std::endl;
         }
@@ -257,48 +90,65 @@ std::vector<double> InferPEP::qns_to_pep(const std::vector<double>& q_values, co
     return regressor_ptr_->fit_xy(scores, raw_pep);
 }
 
-std::vector<double> InferPEP::tdc_to_pep(const std::vector<double>& is_decoy, const std::vector<double>& scores) {
+std::vector<double>
+InferPEP::tdc_to_pep(const std::vector<double>& is_decoy,
+                     const std::vector<double>& scores) {
+  using namespace std::chrono;
+  auto start = high_resolution_clock::now();
+  if (VERB > 2) std::cerr << "[TIMING] entering tdc_to_pep\n";
 
-    using namespace std::chrono;
-    auto start = std::chrono::high_resolution_clock::now();
-    if (VERB > 2)
-        std::cerr << "[TIMING] entering tdc_to_pep\n";
+  const double epsilon = 1e-20;
 
-    double epsilon = 1e-20;
-    auto is_dec = is_decoy;
-    is_dec.insert(is_dec.begin(), 0.5);
+  // Build target vector (prepend as your original code does to anchor the fit)
+  std::vector<double> is_dec = is_decoy;
+  is_dec.insert(is_dec.begin(), 0.5);
 
-    std::vector<double> decoy_rate;
-    if (!scores.empty()) {
-        if (VERB > 2)
-            std::cerr << "[TIMING] choosing fit_xy\n";
-        auto sc = scores;
-        sc.insert(sc.begin(), sc[0]);
-        decoy_rate = regressor_ptr_->fit_xy(sc, is_dec, epsilon, 1. - epsilon);
-    } else {
-        if (VERB > 2)
-            std::cerr << "[TIMING] choosing fit_y\n";
-        decoy_rate = regressor_ptr_->fit_y(is_dec,  epsilon, 1. - epsilon);
-    }
+  std::vector<double> sc;
+  if (!scores.empty()) {
+    sc = scores;
+    sc.insert(sc.begin(), sc.front());
+  }
+
+  // Spline / ridge settings (reuse yours)
+  const int degree = ispline_degree_;
+  const double lambda = ridge_lambda_tdc_;
+  const bool include_intercept = include_intercept_;
+  const int intercept_col = include_intercept ? 0 : -1;
+  const std::vector<double>& knots = ispline_knots_;
+
+  std::vector<double> w(is_dec.size(), 1.0);
+
+  // Fit decoy-rate in (epsilon, 1-epsilon); clamp outputs
+  std::vector<double> decoy_rate;
+  if (!scores.empty()) {
+    decoy_rate = fit_ispline_trr_predict(
+        sc, is_dec, w, lambda, degree, knots, include_intercept,
+        intercept_col, /*clip_lo=*/epsilon, /*clip_hi=*/1.0 - epsilon);
+    // drop the prepended element
     decoy_rate.erase(decoy_rate.begin());
+  } else {
+    // No scores: constant fit to the mean (respecting epsilon)
+    double m = 0.0; for (double v : is_dec) m += v; m /= (double)is_dec.size();
+    m = std::min(1.0 - epsilon, std::max(epsilon, m));
+    decoy_rate.assign(is_decoy.size(), m);
+  }
 
-    std::vector<double> pep_iso;
-    // auto i_d = is_decoy.begin(); double tar = 0.; double dec = 0.; double errors = 0.;
-    for (auto& dp : decoy_rate) {
-        if (dp > 1. - epsilon)
-            dp = 1. - epsilon;
-        double pep = dp / (1 - dp);
-        if (pep > 1.)
-            pep = 1.;
-        pep_iso.push_back(pep);
-        // if (*i_d>0.5) {dec+=1.;} else {tar+=1.; errors += pep;} i_d++;
-        // cerr << dp << "\t" << pep << "\t" << tar << "\t" << dec << "\t" << errors << "\t" << (dec+0.5)/(tar) << "\t" << errors/(tar) << std::endl;
-    }
+  // Convert to PEP = p(decoy) / (1 - p(decoy))
+  std::vector<double> pep_iso; pep_iso.reserve(decoy_rate.size());
+  for (double dp : decoy_rate) {
+    double pep = dp / (1.0 - dp);
+    if (pep > 1.0) pep = 1.0;
+    pep_iso.push_back(pep);
+  }
 
-    auto end = std::chrono::high_resolution_clock::now();
-    double duration = std::chrono::duration<double>(end - start).count();
-    if (VERB > 2)
-        std::cerr << "[TIMING] tdc_to_pep duration: " << duration << " seconds\n";
-
-    return pep_iso;
+  auto end = high_resolution_clock::now();
+  if (VERB > 2) {
+    double duration = duration_cast<duration<double>>(end - start).count();
+    std::cerr << "[TIMING] tdc_to_pep duration: " << duration << " seconds\n";
+  }
+  return pep_iso;
 }
+
+
+
+

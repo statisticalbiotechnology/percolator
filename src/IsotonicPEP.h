@@ -7,95 +7,13 @@
 #include <memory>   // for std::unique_ptr, std::make_unique
 #include <algorithm> // for std::min, std::max
 
-#include <Eigen/Dense>
-#include <Eigen/Sparse> 
-
 // Constants for tuning (Point 7)
 constexpr int DEFAULT_NUM_BINS = 10000;
 constexpr double DEFAULT_LAMBDA = 1e-6;
 constexpr int DEFAULT_NUM_KNOTS = 50;
 constexpr double DEFAULT_SKEW_FACTOR = 0.75;
 
-template <typename T>
-const T& clamp(const T& v, const T& lo, const T& hi) {
-    return (v < lo) ? lo : (hi < v) ? hi : v;
-}
 
-class IsotonicRegression {
-public:
-    IsotonicRegression() = default;
-    virtual ~IsotonicRegression() = default;
-
-    virtual std::vector<double> fit_y(const std::vector<double>& y, 
-                                      double min_val = std::numeric_limits<double>::lowest(),
-                                      double max_val = std::numeric_limits<double>::max()) const = 0;
-
-    virtual std::vector<double> fit_xy(const std::vector<double>& x, const std::vector<double>& y,
-                                       double min_val = std::numeric_limits<double>::lowest(),
-                                       double max_val = std::numeric_limits<double>::max()) const = 0;
-};
-
-class PavaRegression : public IsotonicRegression {
-protected:
-    //--------------------------------------------------------
-    // A simple block structure for merging
-    //--------------------------------------------------------
-    struct Block {
-        double sum   = 0.0;
-        int    count = 0;
-        double avg   = 0.0;
-    };
-
-    virtual std::vector<double> pavaNonDecreasingRanged(
-        const std::vector<double>& values,
-        const double min_value = std::numeric_limits<double>::min(),
-        const double max_value = std::numeric_limits<double>::max()
-    ) const;
-
-public:
-    std::vector<double> fit_y(const std::vector<double>& y, double min_val, double max_val) const override
-    { return pavaNonDecreasingRanged(y, min_val, max_val); }
-    std::vector<double> fit_xy(const std::vector<double>&/* x */, const std::vector<double>& y,
-                               double min_val, double max_val) const override { return fit_y(y, min_val, max_val); };
-
-};
-
-
-class IsplineRegression : public IsotonicRegression {
-    public:
-        IsplineRegression(int num_bins = DEFAULT_NUM_BINS,
-            double lambda = DEFAULT_LAMBDA,
-            int max_knots = DEFAULT_NUM_KNOTS,
-            double skew_factor = DEFAULT_SKEW_FACTOR) : 
-                num_bins_(num_bins),
-                lambda_(lambda),
-                max_knots_(max_knots),
-                skew_factor_(skew_factor) {}
-
-        std::vector<double> fit_xy(const std::vector<double>& x, const std::vector<double>& y,
-            double min_val = std::numeric_limits<double>::lowest(),
-            double max_val = std::numeric_limits<double>::max()) const override;
-        std::vector<double> fit_y(const std::vector<double>& y, 
-            double min_val = std::numeric_limits<double>::lowest(),
-            double max_val = std::numeric_limits<double>::max()) const override;
-
-        struct BinnedData {
-            std::vector<double> x, y, weights;
-        };
-        double cubic_ispline(double x, double left, double right) const;
-
-    protected:
-    
-        BinnedData bin_data(const std::vector<double>& x, const std::vector<double>& y, int max_bins) const;
-        std::vector<double> compute_adaptive_knots(const std::vector<double>& x, const std::vector<double>& y, int num_knots) const;
-        Eigen::VectorXd fit_spline(const BinnedData& data, const std::vector<double>& knots, double lambda) const;
-
-        int num_bins_;
-        double lambda_;
-        int max_knots_;
-        double skew_factor_;    
-    };
-    
 
 class InferPEP {
     public:
