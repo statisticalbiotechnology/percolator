@@ -133,4 +133,4 @@ build_component "percolator" "${src_dir}/percolator" "-DGOOGLE_TEST=1"
 
 echo "build directory was : ${build_dir}";
 
-cp -v ${build_dir}/{percolator}/*.pkg ${release_dir};
+cp -v ${build_dir}/percolator/*.pkg ${release_dir};
