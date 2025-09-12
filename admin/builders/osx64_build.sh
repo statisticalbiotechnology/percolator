@@ -90,6 +90,17 @@ echo "The Builder $0 is building the Percolator packages with src=${src_dir} an\
 d build=${build_dir} for user" `whoami`
 $package_manager install $other_packages
 $package_manager install $boost_install_options
+
+if [[ -f /usr/local/bin/brew || -f /opt/homebrew/bin/brew ]]  
+  then
+  export HOMEBREW_PREFIX="/opt/homebrew"
+  export OMP_PREFIX="$HOMEBREW_PREFIX/opt/libomp"
+
+  # Make omp.h and libomp visible
+  export CXXFLAGS="$CXXFLAGS -I$OMP_PREFIX/include"
+  export LDFLAGS="$LDFLAGS -L$OMP_PREFIX/lib"
+fi
+
 cd ${src_dir}
 
 # read all urls and file names from a centralized kb file

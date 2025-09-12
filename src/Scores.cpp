@@ -390,8 +390,8 @@ void Scores::normalizeScores(double fdr, std::vector<double>& weights) {
   if (diff <= 0) {
     ostringstream oss;
     oss << "Error: median decoy score <= score at " << fdr * 100
-        << "\% FDR. Cannot rescale scores to merge cross validation bins, try "
-           "lowering --trainFDR.\n";
+        << R"% FDR. Cannot rescale scores to merge cross validation bins, try "
+        << "lowering --trainFDR.\n";
     if (NO_TERMINATE) {
       cerr << oss.str()
            << "No-terminate flag set: apply offset such that median "
