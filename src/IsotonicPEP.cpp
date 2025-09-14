@@ -14,36 +14,15 @@
 #include "MonotoneRegressor.h"
 #include "IsotonicPEP.h"
 
-
-// Forward-defined concrete classes
-class PAVARegressor :: public MonotoneRegressor;
-class ISplineTRRRegressor :: public MonotoneRegressor;
-
-std::unique_ptr<MonotoneRegressor> make_regressor(RegressorType type, const MonotoneParams& params) {
-  std::unique_ptr<MonotoneRegressor> ptr;
-  switch (type) {
-    case RegressorType::PAVA:
-      ptr = std::unique_ptr<MonotoneRegressor>(new PAVARegressor());
-      break;
-    case RegressorType::ISPLINE_TRR:
-      ptr = std::unique_ptr<MonotoneRegressor>(new ISplineTRRRegressor());
-      break;
-  }
-  ptr->set_params(params);
-  return ptr;
-}
-
-
-
 InferPEP::InferPEP(bool use_ispline)
 {
     if (use_ispline) {
-        regressor_ptr_ = make_regressor(RegressorType::ISPLINE_TRR, MonotoneParams());
+        regressor_ptr_ = make_monotone_regressor(RegressorType::ISPLINE_TRR, MonotoneParams());
         if (VERB > 1) {
             std::cerr << "Performing isotonic regression using I-Splines" << std::endl;
         }                
     } else {
-        regressor_ptr_ = make_regressor(RegressorType::PAVA, MonotoneParams());
+        regressor_ptr_ = make_monotone_regressor(RegressorType::PAVA, MonotoneParams());
         if (VERB > 1) {
             std::cerr << "Performing isotonic regression using PAVA" << std::endl;
         }

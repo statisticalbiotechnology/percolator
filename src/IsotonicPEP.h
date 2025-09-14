@@ -6,14 +6,14 @@
 #include <iostream> // for std::cerr, std::endl
 #include <memory>   // for std::unique_ptr, std::make_unique
 #include <algorithm> // for std::min, std::max
-
+#include "MonotoneRegressor.h"
 // Constants for tuning (Point 7)
 constexpr int DEFAULT_NUM_BINS = 10000;
 constexpr double DEFAULT_LAMBDA = 1e-6;
 constexpr int DEFAULT_NUM_KNOTS = 50;
 constexpr double DEFAULT_SKEW_FACTOR = 0.75;
 
-
+class MonotoneRegressor;
 
 class InferPEP {
     public:
@@ -29,7 +29,7 @@ class InferPEP {
         }
         
     private:
-        std::unique_ptr<IsotonicRegression> regressor_ptr_;
+        std::unique_ptr<MonotoneRegressor> regressor_ptr_;
         std::vector<double> qs;
         std::vector<double> pep_iso;
     };

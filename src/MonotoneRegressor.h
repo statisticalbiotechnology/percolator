@@ -41,6 +41,4 @@ enum class RegressorType {
   ISPLINE_TRR    // trust-region reflective constrained ridge I-spline
 };
 
-// Factory
-std::unique_ptr<MonotoneRegressor>
-make_regressor(RegressorType type, const MonotoneParams& params);
+std::unique_ptr<MonotoneRegressor> make_monotone_regressor(RegressorType type, const MonotoneParams& params);
