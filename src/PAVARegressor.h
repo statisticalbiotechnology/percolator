@@ -8,13 +8,13 @@ public:
 
   std::vector<double> fit_xy(const std::vector<double>& x,
                              const std::vector<double>& y,
-                             double clip_lo, double clip_hi) override {
+                             double clip_lo = 0.0, double clip_hi = 1.0) override {
     auto out = pava_impl(y, clip_lo, clip_hi);
     return out;
   }
 
   std::vector<double> fit_y(const std::vector<double>& y,
-                            double clip_lo, double clip_hi) override {
+                            double clip_lo = 0.0, double clip_hi = 1.0) override {
     auto out = pava_impl(y, clip_lo, clip_hi);
     return out;
   }

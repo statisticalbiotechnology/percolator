@@ -216,7 +216,7 @@ public:
 
   std::vector<double> fit_xy(const std::vector<double>& x,
                              const std::vector<double>& y,
-                             double clip_lo, double clip_hi) override {
+                             double clip_lo = 0.0, double clip_hi = 1.0) override {
     assert(x.size() == y.size());
     const int n = (int)x.size();
 
@@ -263,10 +263,17 @@ public:
   }
 
   std::vector<double> fit_y(const std::vector<double>& y,
-                            double clip_lo, double clip_hi) override {
+                            double clip_lo = 0.0, double clip_hi = 1.0) override {
     // No x provided: use rank as a x-value.
     std::vector<double> x(y.size());
     std::iota(x.begin(), x.end(), 0.0);
     return fit_xy(x, y, clip_lo, clip_hi);
+  }
+
+  double cubic_ispline(double x, double left, double right) const {
+    if (x < left) return 0.0;
+    if (x >= right) return 1.0;
+    double u = (x - left) / (right - left);
+    return 3 * u * u - 2 * u * u * u;
   }
 };
