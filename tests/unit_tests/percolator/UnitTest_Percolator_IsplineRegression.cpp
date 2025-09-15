@@ -1,12 +1,13 @@
 #include <gtest/gtest.h>
+#include "ISplineTRRRegressor.h"
 #include "IsotonicPEP.h" // Your header file with IsplineRegression
 
 class IsplineRegressionTest : public ::testing::Test {
 protected:
-    IsplineRegression model;
+    ISplineTRRRegressor model;
 
     void SetUp() override {
-        model = IsplineRegression(); // default degree=2
+        model = ISplineTRRRegressor(); // default degree=2
     }
 };
 

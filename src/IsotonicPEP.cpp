@@ -7,10 +7,12 @@
 #include <numeric>    // for std::iota
 #include <cassert>
 #include <iostream>
+#include <chrono>
+using clock_type = std::chrono::high_resolution_clock;
 
 #include <Eigen/Dense>
 #include <Eigen/Sparse> 
-#include <chrono>
+
 #include "MonotoneRegressor.h"
 #include "IsotonicPEP.h"
 
@@ -73,7 +75,7 @@ std::vector<double>
 InferPEP::tdc_to_pep(const std::vector<double>& is_decoy,
                      const std::vector<double>& scores) {
   using namespace std::chrono;
-  auto start = high_resolution_clock::now();
+  auto start = clock_type::now();
   if (VERB > 2) std::cerr << "[TIMING] entering tdc_to_pep\n";
 
   const double epsilon = 1e-20;
@@ -100,16 +102,14 @@ InferPEP::tdc_to_pep(const std::vector<double>& is_decoy,
   // Fit decoy-rate in (epsilon, 1-epsilon); clamp outputs
   std::vector<double> decoy_rate;
   if (!scores.empty()) {
-    decoy_rate = fit_ispline_trr_predict(
-        sc, is_dec, w, lambda, degree, knots, include_intercept,
-        intercept_col, /*clip_lo=*/epsilon, /*clip_hi=*/1.0 - epsilon);
+    regressor_ptr_->fit_xy(scores, decoy_rate, /*clip_lo=*/epsilon, /*clip_hi=*/1.0 - epsilon);
+    // decoy_rate = fit_ispline_trr_predict(
+    //    sc, is_dec, w, lambda, degree, knots, include_intercept,
+    //    intercept_col, /*clip_lo=*/epsilon, /*clip_hi=*/1.0 - epsilon);
     // drop the prepended element
-    decoy_rate.erase(decoy_rate.begin());
+    // decoy_rate.erase(decoy_rate.begin());
   } else {
-    // No scores: constant fit to the mean (respecting epsilon)
-    double m = 0.0; for (double v : is_dec) m += v; m /= (double)is_dec.size();
-    m = std::min(1.0 - epsilon, std::max(epsilon, m));
-    decoy_rate.assign(is_decoy.size(), m);
+    regressor_ptr_->fit_y(decoy_rate, /*clip_lo=*/epsilon, /*clip_hi=*/1.0 - epsilon);
   }
 
   // Convert to PEP = p(decoy) / (1 - p(decoy))
@@ -120,9 +120,9 @@ InferPEP::tdc_to_pep(const std::vector<double>& is_decoy,
     pep_iso.push_back(pep);
   }
 
-  auto end = high_resolution_clock::now();
+  auto end = clock_type::now();
   if (VERB > 2) {
-    double duration = duration_cast<duration<double>>(end - start).count();
+    double duration = std::chrono::duration_cast<std::chrono::duration<double>>(end - start).count();
     std::cerr << "[TIMING] tdc_to_pep duration: " << duration << " seconds\n";
   }
   return pep_iso;
