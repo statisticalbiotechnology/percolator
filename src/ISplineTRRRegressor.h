@@ -21,6 +21,7 @@ struct CostGrad {
   double f;
   VectorXd g;
 };
+
 inline CostGrad costGrad(const MatrixXd& A, const VectorXd& b, const VectorXd& x) {
   VectorXd r = A * x - b;
   CostGrad cg;
@@ -46,7 +47,7 @@ inline std::vector<int> freeSet(const VectorXd& x, const VectorXd& g,
 // Here H = 2*A_F^T*A_F, but we never form H explicitly; we do Hv = 2*A_F^T*(A_F*v).
 struct TRStep { VectorXd p; double pred_red; bool hit_boundary; };
 
-TRStep steihaugCG(const MatrixXd& A, const VectorXd& b,
+inline TRStep steihaugCG(const MatrixXd& A, const VectorXd& b,
                   const VectorXd& x, const std::vector<int>& F, double Delta) {
   // Work only on free coordinates via views
   // Define operators on free set: apply H_F v = 2*A_F^T*(A_F v)
@@ -147,7 +148,7 @@ struct TRRResult {
   bool converged;
 };
 
-TRRResult trr_boxed_ls(const MatrixXd& Atilde, const VectorXd& btilde,
+inline TRRResult trr_boxed_ls(const MatrixXd& Atilde, const VectorXd& btilde,
                        const VectorXd& lb, const VectorXd& ub, VectorXd x0,
                        const TRROpts& opts = {}) {
   VectorXd x = x0; projectToBox(x, lb, ub);
@@ -202,13 +203,65 @@ TRRResult trr_boxed_ls(const MatrixXd& Atilde, const VectorXd& btilde,
   return {x, cg_end.f, opts.max_iters, false};
 }
 
+namespace ispline_detail {
+inline double cubic_ispline_impl(double x, double left, double right) {
+  if (x < left) return 0.0;
+  if (x >= right) return 1.0;
+  double u = (x - left) / (right - left);
+  return 3 * u * u - 2 * u * u * u;
+}
+}
 
-// Forward decl: use your actual basis builder from IsotonicPEP.*
-static Eigen::MatrixXd build_ispline_design(
+inline Eigen::MatrixXd build_ispline_design(
     const std::vector<double>& scores,
-    int degree,
-    const std::vector<double>& knots,
-    bool include_intercept);
+    int /*degree*/,
+    const std::vector<double>& knots_in,
+    bool include_intercept)
+{
+  // Copy + sanitize knots: sort, unique, ensure at least two
+  std::vector<double> knots = knots_in;
+  if (knots.size() < 2) {
+    // Derive a minimal knot span from data
+    double xmin = std::numeric_limits<double>::infinity();
+    double xmax = -std::numeric_limits<double>::infinity();
+    for (double s : scores) { xmin = std::min(xmin, s); xmax = std::max(xmax, s); }
+    if (!std::isfinite(xmin) || !std::isfinite(xmax)) { xmin = 0.0; xmax = 1.0; }
+    if (xmax <= xmin) xmax = xmin + 1e-6; // avoid zero width
+    knots = { xmin, xmax };
+  }
+  std::sort(knots.begin(), knots.end());
+  knots.erase(std::unique(knots.begin(), knots.end()), knots.end());
+  if (knots.size() < 2) {
+    // If still < 2 after unique, expand slightly
+    double k0 = knots.empty() ? 0.0 : knots.front();
+    knots = { k0, k0 + 1e-6 };
+  }
+
+  const int n = static_cast<int>(scores.size());
+  const int m = static_cast<int>(knots.size()) - 1; // number of intervals/bases
+  const int p = m + (include_intercept ? 1 : 0);
+
+  Eigen::MatrixXd X(n, p);
+  int col0 = 0;
+  if (include_intercept) {
+    X.col(0).setOnes();
+    col0 = 1;
+  }
+
+  for (int j = 0; j < m; ++j) {
+    const double kj   = knots[j];
+    const double kj1  = knots[j+1];
+    const double wid  = std::max(1e-12, kj1 - kj); // protect against zero width
+    for (int i = 0; i < n; ++i) {
+      double x = scores[i];
+      double val = ispline_detail::cubic_ispline_impl(x, kj, kj1);
+      X(i, col0 + j) = val;
+    }
+  }
+
+  return X;
+}
+
 
 class ISplineTRRRegressor final : public MonotoneRegressor {
 public:
@@ -270,10 +323,8 @@ public:
     return fit_xy(x, y, clip_lo, clip_hi);
   }
 
-  double cubic_ispline(double x, double left, double right) const {
-    if (x < left) return 0.0;
-    if (x >= right) return 1.0;
-    double u = (x - left) / (right - left);
-    return 3 * u * u - 2 * u * u * u;
+   inline double cubic_ispline(double x, double left, double right) const {
+    return ispline_detail::cubic_ispline_impl(x, left, right);
   }
 };
+
