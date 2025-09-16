@@ -32,7 +32,7 @@ class InferPEP {
         int ispline_degree_ = 3;
         std::vector<double> ispline_knots_;       
         double ridge_lambda_tdc_ = DEFAULT_LAMBDA;
-        bool include_intercept_ = true;
+        bool include_intercept_ = false;
 
         std::unique_ptr<MonotoneRegressor> regressor_ptr_;
         std::vector<double> qs;
