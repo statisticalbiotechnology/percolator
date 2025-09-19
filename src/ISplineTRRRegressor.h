@@ -263,6 +263,44 @@ inline Eigen::MatrixXd build_ispline_design(
 }
 
 
+static std::vector<double> make_default_knots(const std::vector<double>& scores, int degree) {
+  const int n = (int)scores.size();
+  if (n == 0) return {};
+
+  // 1. Sort copy of scores
+  std::vector<double> sorted = scores;
+  std::sort(sorted.begin(), sorted.end());
+
+  // 2. Boundaries
+  double lo = sorted.front();
+  double hi = sorted.back();
+
+  // 3. Number of internal knots
+  int num_knots = std::min(50, (int)std::sqrt(n));
+
+  // 4. Place them at equally spaced quantiles
+  std::vector<double> knots;
+  knots.reserve(num_knots + 2* (degree+1));
+  knots.push_back(lo);
+  for (int k = 1; k <= num_knots; ++k) {
+    double q = (double)k / (num_knots+1); // exclude endpoints
+    size_t idx = (size_t)(q * (n-1));
+    knots.push_back(sorted[idx]);
+  }
+  knots.push_back(hi);
+
+  // 5. Depending on your basis implementation, you may need to pad
+  //    the boundary knots 'degree' times on each side.
+  for (int d = 0; d < degree; ++d) {
+    knots.insert(knots.begin(), lo);
+    knots.push_back(hi);
+  }
+
+  return knots;
+}
+
+
+
 class ISplineTRRRegressor final : public MonotoneRegressor {
 public:
   using MonotoneRegressor::MonotoneRegressor;
@@ -276,9 +314,13 @@ public:
     // Weights: use 1s unless you already carry them
     std::vector<double> w(n, 1.0);
 
+    auto knots = params_.knots;
+    if (knots.size() <= 0) {
+      knots = make_default_knots(x, params_.ispline_degree);
+    }
     // Build X
     Eigen::MatrixXd X = build_ispline_design(
-        x, params_.ispline_degree, params_.knots, params_.include_intercept);
+        x, params_.ispline_degree, knots, params_.include_intercept);
     const int p = (int)X.cols();
 
     // Weighted + ridge-augmented system
@@ -314,7 +356,7 @@ public:
     }
     return yhat;
   }
-
+  
   std::vector<double> fit_y(const std::vector<double>& y,
                             double clip_lo = 0.0, double clip_hi = 1.0) override {
     // No x provided: use rank as a x-value.
