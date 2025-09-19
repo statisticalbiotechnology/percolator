@@ -19,12 +19,12 @@ using clock_type = std::chrono::high_resolution_clock;
 InferPEP::InferPEP(bool use_ispline)
 {
     if (use_ispline) {
-        regressor_ptr_ = make_monotone_regressor(RegressorType::ISPLINE_TRR, MonotoneParams());
+        regressor_ptr_ = make_monotone_regressor(RegressorType::ISPLINE_TRR);
         if (VERB > 1) {
             std::cerr << "Performing isotonic regression using I-Splines" << std::endl;
         }                
     } else {
-        regressor_ptr_ = make_monotone_regressor(RegressorType::PAVA, MonotoneParams());
+        regressor_ptr_ = make_monotone_regressor(RegressorType::PAVA);
         if (VERB > 1) {
             std::cerr << "Performing isotonic regression using PAVA" << std::endl;
         }
@@ -89,13 +89,6 @@ InferPEP::tdc_to_pep(const std::vector<double>& is_decoy,
     sc = scores;
     sc.insert(sc.begin(), sc.front());
   }
-
-  // Spline / ridge settings (reuse yours)
-  const int degree = ispline_degree_;
-  const double lambda = ridge_lambda_tdc_;
-  const bool include_intercept = include_intercept_;
-  const int intercept_col = include_intercept ? 0 : -1;
-  const std::vector<double>& knots = ispline_knots_;
 
   std::vector<double> w(is_dec.size(), 1.0);
 

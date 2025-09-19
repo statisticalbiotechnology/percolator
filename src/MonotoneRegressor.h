@@ -2,6 +2,13 @@
 #include <vector>
 #include <memory>
 
+
+// Constants for tuning (Point 7)
+constexpr double DEFAULT_LAMBDA = 1e-6;
+constexpr int DEFAULT_NUM_KNOTS = 50;
+constexpr double DEFAULT_SKEW_FACTOR = 0.75;
+
+
 struct MonotoneParams {
   // Shared
   double clip_lo = 0.0;
@@ -9,8 +16,8 @@ struct MonotoneParams {
   // I-spline TRR specific
   double ridge_lambda = 1e-3;
   int ispline_degree = 3;
-  bool include_intercept = false;
-  int intercept_col = -1; // if include_intercept, usually 0
+  bool include_intercept = true;
+  int intercept_col = 0; // if include_intercept, usually 0
   std::vector<double> knots; // knot policy fills this
 };
 
@@ -41,4 +48,4 @@ enum class RegressorType {
   ISPLINE_TRR    // trust-region reflective constrained ridge I-spline
 };
 
-std::unique_ptr<MonotoneRegressor> make_monotone_regressor(RegressorType type, const MonotoneParams& params);
+std::unique_ptr<MonotoneRegressor> make_monotone_regressor(RegressorType type);

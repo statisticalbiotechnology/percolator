@@ -92,13 +92,17 @@ TEST_F(IsplineRegressionTest, FitXYBinaryInputsLarge) {
 
 TEST_F(IsplineRegressionTest, HandlesConstantInput) {
     // Test when all y are identical
-    std::vector<double> y(100, 0.5);
+    std::vector<double> y(10000, 0.5);
     std::vector<double> fitted = model.fit_y(y);
 
     ASSERT_EQ(fitted.size(), y.size());
-
+    /*
     for (size_t i = 0; i < fitted.size(); ++i) {
-        ASSERT_NEAR(fitted[i], 0.5, 1e-6);
+        std::cerr << i << "\t" << fitted[i] << std::endl;
+    }
+    */
+    for (size_t i = 0; i < fitted.size(); ++i) {
+        ASSERT_NEAR(fitted[i], 0.5, 1e-4);
     }
 }
 

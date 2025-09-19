@@ -5,11 +5,6 @@
 #include <iostream> // for std::cerr, std::endl
 #include <memory>   // for std::unique_ptr, std::make_unique
 #include "MonotoneRegressor.h"
-// Constants for tuning (Point 7)
-constexpr int DEFAULT_NUM_BINS = 10000;
-constexpr double DEFAULT_LAMBDA = 1e-6;
-constexpr int DEFAULT_NUM_KNOTS = 50;
-constexpr double DEFAULT_SKEW_FACTOR = 0.75;
 
 class MonotoneRegressor;
 
@@ -28,12 +23,6 @@ class InferPEP {
         }
         
     private:
-      // ---- hyper-parameters / state used by IsotonicPEP.cpp ----
-        int ispline_degree_ = 3;
-        std::vector<double> ispline_knots_;       
-        double ridge_lambda_tdc_ = DEFAULT_LAMBDA;
-        bool include_intercept_ = false;
-
         std::unique_ptr<MonotoneRegressor> regressor_ptr_;
         std::vector<double> qs;
         // std::vector<double> pep_iso;
