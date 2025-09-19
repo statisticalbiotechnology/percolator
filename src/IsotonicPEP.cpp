@@ -95,16 +95,15 @@ InferPEP::tdc_to_pep(const std::vector<double>& is_decoy,
   // Fit decoy-rate in (epsilon, 1-epsilon); clamp outputs
   std::vector<double> decoy_rate;
   if (!scores.empty()) {
-    regressor_ptr_->fit_xy(scores, decoy_rate, /*clip_lo=*/epsilon, /*clip_hi=*/1.0 - epsilon);
+    decoy_rate = regressor_ptr_->fit_xy(sc, is_dec, /*clip_lo=*/epsilon, /*clip_hi=*/1.0 - epsilon);
     // decoy_rate = fit_ispline_trr_predict(
     //    sc, is_dec, w, lambda, degree, knots, include_intercept,
     //    intercept_col, /*clip_lo=*/epsilon, /*clip_hi=*/1.0 - epsilon);
     // drop the prepended element
     // decoy_rate.erase(decoy_rate.begin());
   } else {
-    regressor_ptr_->fit_y(decoy_rate, /*clip_lo=*/epsilon, /*clip_hi=*/1.0 - epsilon);
+    decoy_rate = regressor_ptr_->fit_y(is_dec, /*clip_lo=*/epsilon, /*clip_hi=*/1.0 - epsilon);
   }
-
   // Convert to PEP = p(decoy) / (1 - p(decoy))
   std::vector<double> pep_iso; pep_iso.reserve(decoy_rate.size());
   for (double dp : decoy_rate) {

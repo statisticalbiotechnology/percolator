@@ -1,4 +1,5 @@
 #include "MonotoneRegressor.h"
+#include <iostream> // for std::cerr, std::endl
 #include <Eigen/Dense>
 #include <limits>
 #include <numeric>
@@ -311,6 +312,7 @@ public:
     assert(x.size() == y.size());
     const int n = (int)x.size();
 
+
     // Weights: use 1s unless you already carry them
     std::vector<double> w(n, 1.0);
 
@@ -365,7 +367,7 @@ public:
     return fit_xy(x, y, clip_lo, clip_hi);
   }
 
-   inline double cubic_ispline(double x, double left, double right) const {
+  inline double cubic_ispline(double x, double left, double right) const {
     return ispline_detail::cubic_ispline_impl(x, left, right);
   }
 };

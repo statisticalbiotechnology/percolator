@@ -108,7 +108,7 @@ void Scores::scoreAndAddPSM(ScoreHolder& sh,
 }
 
 void Scores::print(LabelType label, std::ostream& os) {
-  std::vector<ScoreHolder>::iterator scoreIt = scores_.begin();
+ std::vector<ScoreHolder>::iterator scoreIt = scores_.begin();
   os << "PSMId\t";
   if (PSMDescription::hasSpectrumFileName()) {
     os << "filename\t";
