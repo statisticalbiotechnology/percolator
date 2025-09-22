@@ -58,14 +58,16 @@ add_subdirectory(src)
 # TESTING
 ###############################################################################
 
-# Enabling system level tests (Ctest)
-enable_testing()
-# Scheduling system level tests
-add_subdirectory(data/system_tests/percolator)
-add_subdirectory(tests/integration_tests/percolator)
-# Scheduling unit level tests
-if(NOT WITHOUT_GTEST)
-  add_subdirectory(tests/unit_tests/percolator)
+if(NOT NO_TESTS)
+  # Enabling system level tests (Ctest)
+  enable_testing()
+  # Scheduling system level tests
+  add_subdirectory(data/system_tests/percolator)
+  add_subdirectory(tests/integration_tests/percolator)
+  # Scheduling unit level tests
+  if(NOT WITHOUT_GTEST)
+    add_subdirectory(tests/unit_tests/percolator)
+  endif()
 endif()
 
 ###############################################################################
