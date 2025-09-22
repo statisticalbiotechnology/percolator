@@ -21,6 +21,8 @@ include("CommonCMake.txt")
 my_set(CMAKE_BUILD_TYPE "Debug" "Choose the type of build, options are: None Debug Release RelWithDebInfo MinSizeRel.")
 my_set(CMAKE_PREFIX_PATH "../" "Default path to packages")
 
+option(NO_TESTS "Build system and integration tests" OFF)
+
 # PRINT VARIBALES TO STDOUT
 MESSAGE( STATUS )
 MESSAGE( STATUS
@@ -31,6 +33,7 @@ MESSAGE( STATUS "change a configuration variable with: cmake -D<Variable>=<Value
 MESSAGE( STATUS "CMAKE_INSTALL_PREFIX = ${CMAKE_INSTALL_PREFIX}" )
 MESSAGE( STATUS "CMAKE_BUILD_TYPE = ${CMAKE_BUILD_TYPE}" )
 MESSAGE( STATUS "CMAKE_PREFIX_PATH = ${CMAKE_PREFIX_PATH}" )
+MESSAGE( STATUS "NO_TESTS = ${NO_TESTS}" )
 MESSAGE( STATUS "GOOGLE_TEST = ${GOOGLE_TEST}" )
 MESSAGE( STATUS "GOOGLE_TEST_PATH = ${GOOGLE_TEST_PATH}" )
 MESSAGE( STATUS "TARGET_ARCH = ${TARGET_ARCH}" )
