@@ -67,6 +67,7 @@ add_executable(gtest_unit
     UnitTest_Percolator_SetHandler.cpp
     UnitTest_Percolator_DataSet.cpp
     UnitTest_Percolator_IsplineRegression.cpp
+    UnitTest_Percolator_InferPep.cpp
     UnitTest_Percolator_Scores.cpp
     UnitTest_Percolator_CrossValidation.cpp
 )

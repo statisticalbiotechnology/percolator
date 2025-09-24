@@ -300,8 +300,6 @@ static std::vector<double> make_default_knots(const std::vector<double>& scores,
   return knots;
 }
 
-
-
 class ISplineTRRRegressor final : public MonotoneRegressor {
 public:
   using MonotoneRegressor::MonotoneRegressor;
@@ -312,17 +310,19 @@ public:
     assert(x.size() == y.size());
     const int n = (int)x.size();
 
+    std::vector<double> x_work = x;
+    if (params_.y_decreasing_in_x) for (auto& v : x_work) v = -v;
 
     // Weights: use 1s unless you already carry them
     std::vector<double> w(n, 1.0);
 
     auto knots = params_.knots;
     if (knots.size() <= 0) {
-      knots = make_default_knots(x, params_.ispline_degree);
+      knots = make_default_knots(x_work, params_.ispline_degree);
     }
     // Build X
     Eigen::MatrixXd X = build_ispline_design(
-        x, params_.ispline_degree, knots, params_.include_intercept);
+        x_work, params_.ispline_degree, knots, params_.include_intercept);
     const int p = (int)X.cols();
 
     // Weighted + ridge-augmented system
@@ -363,7 +363,7 @@ public:
                             double clip_lo = 0.0, double clip_hi = 1.0) override {
     // No x provided: use rank as a x-value.
     std::vector<double> x(y.size());
-    std::iota(x.begin(), x.end(), 0.0);
+    std::iota(x.rbegin(), x.rend(), 1.0);  // x[0]=N, ..., x[N-1]=1
     return fit_xy(x, y, clip_lo, clip_hi);
   }
 

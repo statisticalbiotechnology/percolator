@@ -15,6 +15,7 @@ struct MonotoneParams {
   double clip_hi = 1.0;
   // I-spline TRR specific
   double ridge_lambda = 1e-3;
+  bool y_decreasing_in_x = true;
   int ispline_degree = 3;
   bool include_intercept = true;
   int intercept_col = 0; // if include_intercept, usually 0
