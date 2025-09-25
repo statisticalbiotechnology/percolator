@@ -80,43 +80,49 @@ InferPEP::tdc_to_pep(const std::vector<double>& is_decoy,
 
   const double epsilon = 1e-20;
 
-  // Build target vector (prepend as your original code does to anchor the fit)
+  // Work copies
   std::vector<double> is_dec = is_decoy;
-  is_dec.insert(is_dec.begin(), 0.5);
+  std::vector<double> sc = scores;
 
-  std::vector<double> sc;
-  if (!scores.empty()) {
-    sc = scores;
-    sc.insert(sc.begin(), sc.front());
+  // Decide whether we will add an anchor (only in the fit_xy path)
+  const bool will_use_fit_xy = !scores.empty();
+  bool used_anchor = false;
+
+  if (will_use_fit_xy) {
+    // Prepend anchor to BOTH x and y so sizes stay equal
+    is_dec.insert(is_dec.begin(), 0.5);     // neutral label
+    sc.insert(sc.begin(), sc.front());      // duplicate top score
+    used_anchor = true;
   }
 
-  std::vector<double> w(is_dec.size(), 1.0);
-
-  // Fit decoy-rate in (epsilon, 1-epsilon); clamp outputs
+  // Fit decoy rate p(decoy | x)
   std::vector<double> decoy_rate;
-  if (!scores.empty()) {
+  if (will_use_fit_xy) {
     decoy_rate = regressor_ptr_->fit_xy(sc, is_dec, /*clip_lo=*/epsilon, /*clip_hi=*/1.0 - epsilon);
-    // decoy_rate = fit_ispline_trr_predict(
-    //    sc, is_dec, w, lambda, degree, knots, include_intercept,
-    //    intercept_col, /*clip_lo=*/epsilon, /*clip_hi=*/1.0 - epsilon);
-    // drop the prepended element
-    // decoy_rate.erase(decoy_rate.begin());
   } else {
-    decoy_rate = regressor_ptr_->fit_y(is_dec, /*clip_lo=*/epsilon, /*clip_hi=*/1.0 - epsilon);
+    decoy_rate = regressor_ptr_->fit_y(is_dec,      /*clip_lo=*/epsilon, /*clip_hi=*/1.0 - epsilon);
   }
-  // Convert to PEP = p(decoy) / (1 - p(decoy))
-  std::vector<double> pep_iso; pep_iso.reserve(decoy_rate.size());
-  for (double dp : decoy_rate) {
-    double pep = dp / (1.0 - dp);
-    if (pep > 1.0) pep = 1.0;
+
+  // Drop the anchor we added, if any
+  if (used_anchor) {
+    // sc.size() == scores.size() + 1 when used_anchor is true
+    decoy_rate.erase(decoy_rate.begin());
+  }
+
+  std::vector<double> pep_iso;
+  pep_iso.reserve(decoy_rate.size());
+  for (size_t i = 0; i < decoy_rate.size(); ++i) {
+    double p = decoy_rate[i];
+    double pep = p / (1.0 - p);  
+    pep = std::max(0.0, std::min(1.0, pep));
     pep_iso.push_back(pep);
   }
 
-  auto end = clock_type::now();
   if (VERB > 2) {
-    double duration = std::chrono::duration_cast<std::chrono::duration<double>>(end - start).count();
+    double duration = std::chrono::duration_cast<std::chrono::duration<double>>(clock_type::now() - start).count();
     std::cerr << "[TIMING] tdc_to_pep duration: " << duration << " seconds\n";
   }
+
   return pep_iso;
 }
 
