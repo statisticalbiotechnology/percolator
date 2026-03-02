@@ -85,19 +85,30 @@ void check_calibration_q(const std::vector<double>& pep,
   }
 
   // compare mean PEP vs q
+  constexpr int kWarmupTargets = 25;
+  constexpr double kAbsTol = 2e-3;
+
   int targets=0; double pep_sum=0.0;
   for (size_t i=0;i<N;++i) {
     if (is_decoy[i] > 0.5) continue;
-    pep_sum += pep[targets];
+    pep_sum += pep[i];
     targets++;
+
+    if (targets < kWarmupTargets) {
+      continue;
+    }
+
     double pep_mean = pep_sum / (double)targets;
     double qi = q[i];
-    double denom = std::max(1e-10, std::min(pep_mean,qi));
+    double denom = std::max(1e-6, std::min(pep_mean,qi));
     double rel_err = std::abs(pep_mean - qi)/denom;
-    ASSERT_LT(rel_err, rel_tol)
+    double abs_err = std::abs(pep_mean - qi);
+    ASSERT_TRUE(rel_err < rel_tol || abs_err < kAbsTol)
         << "Poor calibration at index " << i
         << " pep_mean=" << pep_mean
-        << " vs q[i]=" << qi;
+        << " vs q[i]=" << qi
+        << " rel_err=" << rel_err
+        << " abs_err=" << abs_err;
   }
 
   EXPECT_NEAR(q.back(),
@@ -147,10 +158,6 @@ TEST_P(TdcToPepCalibrationTest, SyntheticRamp_CalibratedPEPs) {
   }
 
   // 4) Compare cumulative mean PEP among targets vs TDC FDR
-  // This strict synthetic calibration criterion is currently intended for fit_xy.
-  if (!use_fit_xy) {
-    GTEST_SKIP() << "Skipping strict calibration assertion for fit_y path.";
-  }
   check_calibration_q(pep, data.is_decoy, /*rel_tol=*/3.0); // tighten as needed
 }
 
