@@ -147,7 +147,7 @@ TEST_P(TdcToPepCalibrationTest, SyntheticRamp_CalibratedPEPs) {
   }
 
   // 4) Compare cumulative mean PEP among targets vs TDC FDR
-  if (use_fit_xy) // temp shutdown of test
+  // if (use_fit_xy) // temp shutdown of test
     check_calibration_q(pep, data.is_decoy, /*rel_tol=*/3.0); // tighten as needed
 }
 

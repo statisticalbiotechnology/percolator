@@ -16,6 +16,25 @@ using clock_type = std::chrono::high_resolution_clock;
 #include "MonotoneRegressor.h"
 #include "IsotonicPEP.h"
 
+namespace {
+std::vector<double> q_values_to_raw_pep(const std::vector<double>& q_values) {
+  const size_t n = q_values.size();
+  std::vector<double> raw_pep(n);
+  if (n == 0) {
+    return raw_pep;
+  }
+
+  double prev_qn = 0.0;
+  for (size_t i = 0; i < n; ++i) {
+    assert((i + 1 == n) || (q_values[i] <= q_values[i + 1]));
+    const double qn = q_values[i] * static_cast<double>(i + 1);
+    raw_pep[i] = qn - prev_qn;
+    prev_qn = qn;
+  }
+  return raw_pep;
+}
+}  // namespace
+
 InferPEP::InferPEP(bool use_ispline)
 {
     if (use_ispline) {
@@ -33,99 +52,62 @@ InferPEP::InferPEP(bool use_ispline)
 
 std::vector<double> InferPEP::q_to_pep(const std::vector<double>& q_values) {
     qs = q_values;
-
-    std::vector<double> qn(q_values.size());
-    std::vector<int> indices(q_values.size());
-    std::iota(indices.begin(), indices.end(), 1);
-
-    for (size_t i = 0; i < q_values.size(); ++i) {
-        qn[i] = q_values[i] * indices[i];
-        assert((i == q_values.size() - 1) || (q_values[i] <= q_values[i + 1]));
-    }
-    std::vector<double> raw_pep(qn.size());
-    raw_pep[0] = qn[0];
-    for (size_t i = 1; i < qn.size(); ++i) {
-        raw_pep[i] = qn[i] - qn[i - 1];
-    }   
+    const std::vector<double> raw_pep = q_values_to_raw_pep(q_values);
     return regressor_ptr_->fit_y(raw_pep);
 }
 
 std::vector<double> InferPEP::qns_to_pep(const std::vector<double>& q_values, const std::vector<double>& scores) {
     qs = q_values;
-
-    std::vector<double> qn(q_values.size());
-    std::vector<int> indices(q_values.size());
-    std::iota(indices.begin(), indices.end(), 1);
-
-    for (size_t i = 0; i < q_values.size(); ++i) {
-        qn[i] = q_values[i] * indices[i];
-        assert((i == q_values.size() - 1) || (q_values[i] <= q_values[i + 1]));
-    }
-
-    std::vector<double> raw_pep(qn.size());
-    raw_pep[0] = qn[0];
-    for (size_t i = 1; i < qn.size(); ++i) {
-        raw_pep[i] = qn[i] - qn[i - 1];
-    }
-
+    const std::vector<double> raw_pep = q_values_to_raw_pep(q_values);
     return regressor_ptr_->fit_xy(scores, raw_pep);
 }
 
 std::vector<double>
 InferPEP::tdc_to_pep(const std::vector<double>& is_decoy,
                      const std::vector<double>& scores) {
-  using namespace std::chrono;
-  auto start = clock_type::now();
+  const bool print_timing = (VERB > 2);
+  const auto start = print_timing ? clock_type::now() : clock_type::time_point{};
   if (VERB > 2) std::cerr << "[TIMING] entering tdc_to_pep\n";
 
   const double epsilon = 1e-20;
 
-  // Work copies
-  std::vector<double> is_dec = is_decoy;
-  std::vector<double> sc = scores;
-
   // Decide whether we will add an anchor (only in the fit_xy path)
   const bool will_use_fit_xy = !scores.empty();
-  bool used_anchor = false;
 
+  std::vector<double> is_dec;
+  std::vector<double> sc;
   if (will_use_fit_xy) {
-    // Prepend anchor to BOTH x and y so sizes stay equal
-    is_dec.insert(is_dec.begin(), 0.5);     // neutral label
-    sc.insert(sc.begin(), sc.front());      // duplicate top score
-    used_anchor = true;
+    is_dec.reserve(is_decoy.size() + 1);
+    sc.reserve(scores.size() + 1);
+    is_dec.push_back(0.5);     // neutral label
+    sc.push_back(scores.front());      // duplicate top score
+    is_dec.insert(is_dec.end(), is_decoy.begin(), is_decoy.end());
+    sc.insert(sc.end(), scores.begin(), scores.end());
+  } else {
+    is_dec = is_decoy;
   }
 
   // Fit decoy rate p(decoy | x)
-  std::vector<double> decoy_rate;
-  if (will_use_fit_xy) {
-    decoy_rate = regressor_ptr_->fit_xy(sc, is_dec, /*clip_lo=*/epsilon, /*clip_hi=*/1.0 - epsilon);
-  } else {
-    decoy_rate = regressor_ptr_->fit_y(is_dec,      /*clip_lo=*/epsilon, /*clip_hi=*/1.0 - epsilon);
-  }
+  const std::vector<double> decoy_rate = will_use_fit_xy
+      ? regressor_ptr_->fit_xy(sc, is_dec, /*clip_lo=*/epsilon, /*clip_hi=*/1.0 - epsilon)
+      : regressor_ptr_->fit_y(is_dec,      /*clip_lo=*/epsilon, /*clip_hi=*/1.0 - epsilon);
 
-  // Drop the anchor we added, if any
-  if (used_anchor) {
-    // sc.size() == scores.size() + 1 when used_anchor is true
-    decoy_rate.erase(decoy_rate.begin());
-  }
-
-  std::vector<double> pep_iso;
-  pep_iso.reserve(decoy_rate.size());
-  for (size_t i = 0; i < decoy_rate.size(); ++i) {
+  const size_t offset = will_use_fit_xy ? 1 : 0;
+  std::vector<double> pep_iso(decoy_rate.size() - offset);
+  for (size_t i = offset; i < decoy_rate.size(); ++i) {
     double p = decoy_rate[i];
     double pep = p / (1.0 - p);  
     pep = std::max(0.0, std::min(1.0, pep));
-    pep_iso.push_back(pep);
+    pep_iso[i - offset] = pep;
   }
 
-  if (VERB > 2) {
-    double duration = std::chrono::duration_cast<std::chrono::duration<double>>(clock_type::now() - start).count();
+  if (print_timing) {
+    const double duration = std::chrono::duration_cast<std::chrono::duration<double>>(clock_type::now() - start).count();
     std::cerr << "[TIMING] tdc_to_pep duration: " << duration << " seconds\n";
   }
 
   return pep_iso;
 }
-
 
 
 

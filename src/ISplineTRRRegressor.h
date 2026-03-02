@@ -17,17 +17,25 @@ inline void projectToBox(VectorXd& x, const VectorXd& lb, const VectorXd& ub) {
 }
 
 
-// Compute cost and gradient for augmented LS: f = ||A x - b||^2, g = 2 A^T (A x - b)
+// Quadratic objective model:
+//   f(x) = x^T G x - 2 h^T x + c
+//   g(x) = 2 (G x - h)
+struct QuadraticModel {
+  MatrixXd G;
+  VectorXd h;
+  double c;
+};
+
 struct CostGrad {
   double f;
   VectorXd g;
 };
 
-inline CostGrad costGrad(const MatrixXd& A, const VectorXd& b, const VectorXd& x) {
-  VectorXd r = A * x - b;
+inline CostGrad costGrad(const QuadraticModel& q, const VectorXd& x) {
+  const VectorXd Gx = q.G * x;
   CostGrad cg;
-  cg.f = r.squaredNorm();
-  cg.g = 2.0 * (A.transpose() * r);
+  cg.f = x.dot(Gx) - 2.0 * q.h.dot(x) + q.c;
+  cg.g = 2.0 * (Gx - q.h);
   return cg;
 }
 
@@ -45,26 +53,24 @@ inline std::vector<int> freeSet(const VectorXd& x, const VectorXd& g,
 }
 
 // Steihaug–Toint truncated CG: solve (H)p = -g on free vars, with ||p|| <= Delta
-// Here H = 2*A_F^T*A_F, but we never form H explicitly; we do Hv = 2*A_F^T*(A_F*v).
 struct TRStep { VectorXd p; double pred_red; bool hit_boundary; };
 
-inline TRStep steihaugCG(const MatrixXd& A, const VectorXd& b,
-                  const VectorXd& x, const std::vector<int>& F, double Delta) {
-  // Work only on free coordinates via views
-  // Define operators on free set: apply H_F v = 2*A_F^T*(A_F v)
+inline TRStep steihaugCG(const MatrixXd& H,
+                  const VectorXd& x,
+                  const VectorXd& g,
+                  const std::vector<int>& F,
+                  double Delta) {
+  // Work only on free coordinates via views.
   auto Hmul = [&](const VectorXd& vF) {
-    // Build a full vector v with zeros outside F, apply A, then A^T, then extract F
+    // Build a full vector v with zeros outside F, apply H, then extract F.
     VectorXd v = VectorXd::Zero(x.size());
     for (int k = 0; k < (int)F.size(); ++k) v[F[k]] = vF[k];
-    VectorXd Av = A * v;                  // size m
-    VectorXd AtAv = 2.0 * (A.transpose() * Av); // size n
+    VectorXd Hv = H * v;
     VectorXd out(vF.size());
-    for (int k = 0; k < (int)F.size(); ++k) out[k] = AtAv[F[k]];
+    for (int k = 0; k < (int)F.size(); ++k) out[k] = Hv[F[k]];
     return out;
   };
   // Gradient on free set: gF
-  VectorXd r = A * x - b;
-  VectorXd g = 2.0 * (A.transpose() * r);
   VectorXd gF(F.size());
   for (int k = 0; k < (int)F.size(); ++k) gF[k] = g[F[k]];
 
@@ -149,17 +155,19 @@ struct TRRResult {
   bool converged;
 };
 
-inline TRRResult trr_boxed_ls(const MatrixXd& Atilde, const VectorXd& btilde,
-                       const VectorXd& lb, const VectorXd& ub, VectorXd x0,
+inline TRRResult trr_boxed_qp(const QuadraticModel& q,
+                       const VectorXd& lb,
+                       const VectorXd& ub,
+                       VectorXd x0,
                        const TRROpts& opts = {}) {
   VectorXd x = x0; projectToBox(x, lb, ub);
   double Delta = opts.Delta0;
+  const MatrixXd H = 2.0 * q.G;
 
-  auto proj_grad_inf = [&](const VectorXd& x) {
-    CostGrad cg = costGrad(Atilde, btilde, x);
+  auto proj_grad_inf = [&](const VectorXd& x, const VectorXd& g) {
     double normInf = 0.0;
     for (int i = 0; i < x.size(); ++i) {
-      double gi = cg.g[i];
+      double gi = g[i];
       if      (x[i] <= lb[i] + 1e-12) gi = std::min(0.0, gi); // cannot go below lb
       else if (x[i] >= ub[i] - 1e-12) gi = std::max(0.0, gi); // cannot go above ub
       normInf = std::max(normInf, std::abs(gi));
@@ -168,15 +176,15 @@ inline TRRResult trr_boxed_ls(const MatrixXd& Atilde, const VectorXd& btilde,
   };
 
   for (int it = 0; it < opts.max_iters; ++it) {
-    CostGrad cg = costGrad(Atilde, btilde, x);
-    if (proj_grad_inf(x) < opts.gtol)
+    CostGrad cg = costGrad(q, x);
+    if (proj_grad_inf(x, cg.g) < opts.gtol)
       return {x, cg.f, it, true};
 
     // Free set and TR subproblem
     auto F = freeSet(x, cg.g, lb, ub);
     if (F.empty()) return {x, cg.f, it, true}; // stuck at KKT on bounds
 
-    TRStep st = steihaugCG(Atilde, btilde, x, F, Delta);
+    TRStep st = steihaugCG(H, x, cg.g, F, Delta);
     if (st.p.norm() == 0.0) return {x, cg.f, it, true};
 
     // Respect bounds by clamping along p
@@ -185,7 +193,7 @@ inline TRRResult trr_boxed_ls(const MatrixXd& Atilde, const VectorXd& btilde,
 
     // Actual & predicted reduction
     double f_old = cg.f;
-    double f_new = costGrad(Atilde, btilde, x_trial).f;
+    double f_new = costGrad(q, x_trial).f;
     double ared = f_old - f_new;
     double pred = st.pred_red * alphaBox; // linear model along clamped step (good enough)
     double rho = (pred > 0.0) ? (ared / pred) : -std::numeric_limits<double>::infinity();
@@ -200,7 +208,7 @@ inline TRRResult trr_boxed_ls(const MatrixXd& Atilde, const VectorXd& btilde,
     // else reject and keep x, with smaller Delta
   }
 
-  CostGrad cg_end = costGrad(Atilde, btilde, x);
+  CostGrad cg_end = costGrad(q, x);
   return {x, cg_end.f, opts.max_iters, false};
 }
 
@@ -310,33 +318,34 @@ public:
     assert(x.size() == y.size());
     const int n = (int)x.size();
 
-    std::vector<double> x_work = x;
-    if (params_.y_decreasing_in_x) for (auto& v : x_work) v = -v;
-
-    // Weights: use 1s unless you already carry them
-    std::vector<double> w(n, 1.0);
+    std::vector<double> x_work;
+    const std::vector<double>* x_ptr = &x;
+    if (params_.y_decreasing_in_x) {
+      x_work = x;
+      for (auto& v : x_work) v = -v;
+      x_ptr = &x_work;
+    }
 
     auto knots = params_.knots;
     if (knots.size() <= 0) {
-      knots = make_default_knots(x_work, params_.ispline_degree);
+      knots = make_default_knots(*x_ptr, params_.ispline_degree);
     }
     // Build X
     Eigen::MatrixXd X = build_ispline_design(
-        x_work, params_.ispline_degree, knots, params_.include_intercept);
+        *x_ptr, params_.ispline_degree, knots, params_.include_intercept);
     const int p = (int)X.cols();
 
-    // Weighted + ridge-augmented system
-    Eigen::MatrixXd A(n + p, p);
-    Eigen::VectorXd b(n + p);
-    for (int i = 0; i < n; ++i) {
-      double s = 1.0; // sqrt(w[i]) if you have weights
-      A.row(i) = X.row(i) * s;
-      b[i]     = y[i] * s;
+    // Precompute normal-equation terms for objective:
+    // ||X beta - y||^2 + lambda ||beta||^2
+    const Eigen::Map<const Eigen::VectorXd> y_vec(y.data(), n);
+    QuadraticModel q;
+    q.G = X.transpose() * X;
+    q.h = X.transpose() * y_vec;
+    q.c = y_vec.squaredNorm();
+    const double lambda = std::max(0.0, params_.ridge_lambda);
+    if (lambda > 0.0) {
+      q.G.diagonal().array() += lambda;
     }
-    A.bottomRows(p).setZero();
-    for (int j = 0; j < p; ++j)
-      A(n + j, j) = std::sqrt(std::max(0.0, params_.ridge_lambda));
-    b.tail(p).setZero();
 
     // Bounds: non-negative except possibly intercept
     Eigen::VectorXd lb = Eigen::VectorXd::Zero(p);
@@ -346,7 +355,7 @@ public:
 
     Eigen::VectorXd x0 = Eigen::VectorXd::Zero(p);
     TRROpts opts; opts.Delta0 = 1.0; opts.gtol = 1e-8; opts.max_iters = 200;
-    TRRResult sol = trr_boxed_ls(A, b, lb, ub, x0, opts);
+    TRRResult sol = trr_boxed_qp(q, lb, ub, x0, opts);
 
     // Predict + clamp
     std::vector<double> yhat(n);
@@ -371,4 +380,3 @@ public:
     return ispline_detail::cubic_ispline_impl(x, left, right);
   }
 };
-
