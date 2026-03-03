@@ -71,18 +71,14 @@ InferPEP::tdc_to_pep(const std::vector<double>& is_decoy,
 
   const double epsilon = 1e-20;
 
-  // Decide whether we will add an anchor (only in the fit_xy path)
+  // Use scores directly in fit_xy path (no synthetic anchor point).
   const bool will_use_fit_xy = !scores.empty();
 
   std::vector<double> is_dec;
   std::vector<double> sc;
   if (will_use_fit_xy) {
-    is_dec.reserve(is_decoy.size() + 1);
-    sc.reserve(scores.size() + 1);
-    is_dec.push_back(0.5);     // neutral label
-    sc.push_back(scores.front());      // duplicate top score
-    is_dec.insert(is_dec.end(), is_decoy.begin(), is_decoy.end());
-    sc.insert(sc.end(), scores.begin(), scores.end());
+    is_dec = is_decoy;
+    sc = scores;
   } else {
     is_dec = is_decoy;
   }
@@ -92,13 +88,12 @@ InferPEP::tdc_to_pep(const std::vector<double>& is_decoy,
       ? regressor_ptr_->fit_xy(sc, is_dec, /*clip_lo=*/epsilon, /*clip_hi=*/1.0 - epsilon)
       : regressor_ptr_->fit_y(is_dec,      /*clip_lo=*/epsilon, /*clip_hi=*/1.0 - epsilon);
 
-  const size_t offset = will_use_fit_xy ? 1 : 0;
-  std::vector<double> pep_iso(decoy_rate.size() - offset);
-  for (size_t i = offset; i < decoy_rate.size(); ++i) {
+  std::vector<double> pep_iso(decoy_rate.size());
+  for (size_t i = 0; i < decoy_rate.size(); ++i) {
     double p = decoy_rate[i];
     double pep = p / (1.0 - p);  
     pep = std::max(0.0, std::min(1.0, pep));
-    pep_iso[i - offset] = pep;
+    pep_iso[i] = pep;
   }
 
   if (print_timing) {
@@ -108,5 +103,4 @@ InferPEP::tdc_to_pep(const std::vector<double>& is_decoy,
 
   return pep_iso;
 }
-
 
