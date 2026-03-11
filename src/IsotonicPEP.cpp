@@ -77,8 +77,18 @@ InferPEP::tdc_to_pep(const std::vector<double>& is_decoy,
   std::vector<double> is_dec;
   std::vector<double> sc;
   if (will_use_fit_xy) {
+    assert(scores.size() == is_decoy.size());
     is_dec = is_decoy;
     sc = scores;
+
+    // A zero-decoy anchor just above the best observed score lets the monotone
+    // fit decay toward zero in the extreme high-score tail instead of forcing
+    // a positive floor from sparse decoys deeper in the list.
+    const auto mm = std::minmax_element(sc.begin(), sc.end());
+    const double score_span = *mm.second - *mm.first;
+    const double delta = std::max(1.0, score_span * 1e-6);
+    sc.insert(sc.begin(), *mm.second + delta);
+    is_dec.insert(is_dec.begin(), 0.0);
   } else {
     is_dec = is_decoy;
   }
@@ -88,9 +98,10 @@ InferPEP::tdc_to_pep(const std::vector<double>& is_decoy,
       ? regressor_ptr_->fit_xy(sc, is_dec, /*clip_lo=*/epsilon, /*clip_hi=*/1.0 - epsilon)
       : regressor_ptr_->fit_y(is_dec,      /*clip_lo=*/epsilon, /*clip_hi=*/1.0 - epsilon);
 
-  std::vector<double> pep_iso(decoy_rate.size());
-  for (size_t i = 0; i < decoy_rate.size(); ++i) {
-    double p = decoy_rate[i];
+  const size_t offset = will_use_fit_xy ? 1u : 0u;
+  std::vector<double> pep_iso(is_decoy.size());
+  for (size_t i = 0; i < pep_iso.size(); ++i) {
+    double p = decoy_rate[i + offset];
     double pep = p / (1.0 - p);  
     pep = std::max(0.0, std::min(1.0, pep));
     pep_iso[i] = pep;
@@ -103,4 +114,3 @@ InferPEP::tdc_to_pep(const std::vector<double>& is_decoy,
 
   return pep_iso;
 }
-

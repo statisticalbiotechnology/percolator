@@ -51,6 +51,34 @@ SynthData make_synth_data(unsigned seed = 1337) {
   return {scores, is_decoy};
 }
 
+SynthData make_sparse_top_decoy_data(unsigned seed = 2025) {
+  const int n_top = 400;
+  const int n_ramp = 1200;
+  const int n_tail = 1200;
+  const int N = n_top + n_ramp + n_tail;
+
+  std::vector<double> scores(N);
+  for (int i = 0; i < N; ++i) scores[i] = double(N - i);
+
+  std::mt19937 rng(seed);
+  std::vector<double> is_decoy; is_decoy.reserve(N);
+
+  for (int i = 0; i < n_top; ++i) is_decoy.push_back(0.0);
+
+  for (int i = 0; i < n_ramp; ++i) {
+    double p = 0.20 * (double(i) / std::max(1, n_ramp - 1));
+    std::bernoulli_distribution bern(p);
+    is_decoy.push_back(bern(rng) ? 1.0 : 0.0);
+  }
+
+  std::bernoulli_distribution bern_tail(0.5);
+  for (int i = 0; i < n_tail; ++i) {
+    is_decoy.push_back(bern_tail(rng) ? 1.0 : 0.0);
+  }
+
+  return {scores, is_decoy};
+}
+
 // Given pep[i] for i=0..M-1 (aligned with scores/is_decoy),
 // evaluate calibration at each prefix i where the i-th item is a TARGET:
 //   fdr_hat(i)  = (# decoys up to i) / (# targets up to i)
@@ -174,4 +202,25 @@ TEST_P(TdcToPepCalibrationTest, GetParam_Sane_AfterFit) {
 
   // Smoke: model remains usable
   auto pep = infer.tdc_to_pep(data.is_decoy, data.scores);
+}
+
+TEST_P(TdcToPepCalibrationTest, SparseHighScoreDecoys_DoNotForceLargeTailFloor) {
+  auto data = make_sparse_top_decoy_data();
+  auto [use_ispline, use_fit_xy] = GetParam();
+  InferPEP infer(use_ispline);
+
+  std::vector<double> pep = use_fit_xy
+      ? infer.tdc_to_pep(data.is_decoy, data.scores)
+      : infer.tdc_to_pep(data.is_decoy);
+
+  double top_target_sum = 0.0;
+  int top_target_count = 0;
+  for (size_t i = 0; i < pep.size() && top_target_count < 100; ++i) {
+    if (data.is_decoy[i] > 0.5) continue;
+    top_target_sum += pep[i];
+    ++top_target_count;
+  }
+
+  ASSERT_EQ(top_target_count, 100);
+  EXPECT_LT(top_target_sum / top_target_count, 0.05);
 }

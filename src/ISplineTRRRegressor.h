@@ -219,6 +219,24 @@ inline double cubic_ispline_impl(double x, double left, double right) {
   double u = (x - left) / (right - left);
   return 3 * u * u - 2 * u * u * u;
 }
+
+inline std::vector<double> normalize_to_unit_interval(const std::vector<double>& x) {
+  if (x.empty()) return {};
+
+  auto mm = std::minmax_element(x.begin(), x.end());
+  const double xmin = *mm.first;
+  const double xmax = *mm.second;
+  const double span = xmax - xmin;
+  if (!(span > 0.0)) {
+    return std::vector<double>(x.size(), 0.5);
+  }
+
+  std::vector<double> out(x.size());
+  for (size_t i = 0; i < x.size(); ++i) {
+    out[i] = (x[i] - xmin) / span;
+  }
+  return out;
+}
 }
 
 inline Eigen::MatrixXd build_ispline_design(
@@ -325,23 +343,25 @@ public:
       for (auto& v : x_work) v = -v;
       x_ptr = &x_work;
     }
+    const std::vector<double> x_norm = ispline_detail::normalize_to_unit_interval(*x_ptr);
 
     auto knots = params_.knots;
     if (knots.size() <= 0) {
-      knots = make_default_knots(*x_ptr, params_.ispline_degree);
+      knots = make_default_knots(x_norm, params_.ispline_degree);
     }
     // Build X
     Eigen::MatrixXd X = build_ispline_design(
-        *x_ptr, params_.ispline_degree, knots, params_.include_intercept);
+        x_norm, params_.ispline_degree, knots, params_.include_intercept);
     const int p = (int)X.cols();
 
     // Precompute normal-equation terms for objective:
     // ||X beta - y||^2 + lambda ||beta||^2
     const Eigen::Map<const Eigen::VectorXd> y_vec(y.data(), n);
+    const double inv_n = 1.0 / std::max(1, n);
     QuadraticModel q;
-    q.G = X.transpose() * X;
-    q.h = X.transpose() * y_vec;
-    q.c = y_vec.squaredNorm();
+    q.G = inv_n * (X.transpose() * X);
+    q.h = inv_n * (X.transpose() * y_vec);
+    q.c = inv_n * y_vec.squaredNorm();
     const double lambda = std::max(0.0, params_.ridge_lambda);
     if (lambda > 0.0) {
       q.G.diagonal().array() += lambda;
