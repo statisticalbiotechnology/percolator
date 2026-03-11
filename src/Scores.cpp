@@ -727,7 +727,11 @@ void Scores::checkSeparationAndSetPi0() {
 
 void Scores::calcPep(const bool spline, const bool interp, const bool pava) {
     if (!spline) {
-        if (pava) {
+        // Mix-max q-values include pi0-correction and can be much lower than
+        // the raw local decoy odds. In that case, derive PEPs from q-values to
+        // keep q/PEP calibration internally consistent.
+        const bool use_qvalue_path = pava || usePi0_;
+        if (use_qvalue_path) {
             std::vector<double> target_q, sc;
             for (auto& sh : scores_) {
                 if (sh.isTarget()) {
@@ -755,7 +759,7 @@ void Scores::calcPep(const bool spline, const bool interp, const bool pava) {
                     it_pep++; it_q++;
                 } else {
                     double pep = reg.interpolate(sh.q,l_q,*it_q,l_pep,*it_pep);
-                    sh.pep = pep;
+                    sh.pep = std::max(0.0, std::min(1.0, pep));
                 }
             }
         } else {

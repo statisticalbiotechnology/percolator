@@ -57,6 +57,9 @@ std::vector<double> InferPEP::q_to_pep(const std::vector<double>& q_values) {
 }
 
 std::vector<double> InferPEP::qns_to_pep(const std::vector<double>& q_values, const std::vector<double>& scores) {
+    if (q_values.size() != scores.size()) {
+      throw std::invalid_argument("InferPEP::qns_to_pep: q_values and scores size mismatch");
+    }
     qs = q_values;
     const std::vector<double> raw_pep = q_values_to_raw_pep(q_values);
     return regressor_ptr_->fit_xy(scores, raw_pep);
@@ -65,6 +68,9 @@ std::vector<double> InferPEP::qns_to_pep(const std::vector<double>& q_values, co
 std::vector<double>
 InferPEP::tdc_to_pep(const std::vector<double>& is_decoy,
                      const std::vector<double>& scores) {
+  if (!scores.empty() && scores.size() != is_decoy.size()) {
+    throw std::invalid_argument("InferPEP::tdc_to_pep: scores and is_decoy size mismatch");
+  }
   const bool print_timing = (VERB > 2);
   const auto start = print_timing ? clock_type::now() : clock_type::time_point{};
   if (VERB > 2) std::cerr << "[TIMING] entering tdc_to_pep\n";

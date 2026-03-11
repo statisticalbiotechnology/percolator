@@ -1,6 +1,8 @@
 #include "MonotoneRegressor.h"
 #include <algorithm>
 #include <cassert>
+#include <numeric>
+#include <stdexcept>
 
 class PAVARegressor final : public MonotoneRegressor {
 public:
@@ -9,7 +11,36 @@ public:
   std::vector<double> fit_xy(const std::vector<double>& x,
                              const std::vector<double>& y,
                              double clip_lo = 0.0, double clip_hi = 1.0) override {
-    auto out = pava_impl(y, clip_lo, clip_hi);
+    if (x.size() != y.size()) {
+      throw std::invalid_argument("PAVARegressor::fit_xy: x and y size mismatch");
+    }
+    if (y.empty()) {
+      return {};
+    }
+
+    // Sort observations by x, run 1D isotonic fit, then map predictions back.
+    // If y is expected to decrease with x, enforce monotonicity on descending x.
+    std::vector<size_t> order(y.size());
+    std::iota(order.begin(), order.end(), 0);
+    const bool descending_x = params_.y_decreasing_in_x;
+    std::stable_sort(order.begin(), order.end(),
+                     [&](size_t lhs, size_t rhs) {
+                       if (x[lhs] == x[rhs]) {
+                         return lhs < rhs;
+                       }
+                       return descending_x ? (x[lhs] > x[rhs]) : (x[lhs] < x[rhs]);
+                     });
+
+    std::vector<double> y_sorted(y.size());
+    for (size_t i = 0; i < order.size(); ++i) {
+      y_sorted[i] = y[order[i]];
+    }
+    const auto fit_sorted = pava_impl(y_sorted, clip_lo, clip_hi);
+
+    std::vector<double> out(y.size());
+    for (size_t i = 0; i < order.size(); ++i) {
+      out[order[i]] = fit_sorted[i];
+    }
     return out;
   }
 

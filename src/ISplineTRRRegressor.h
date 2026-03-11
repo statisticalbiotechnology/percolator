@@ -303,7 +303,7 @@ static std::vector<double> make_default_knots(const std::vector<double>& scores,
   double hi = sorted.back();
 
   // 3. Number of internal knots
-  int num_knots = std::min(50, (int)std::sqrt(n));
+  int num_knots = std::min(200, (int)std::sqrt(n));
 
   // 4. Place them at equally spaced quantiles
   std::vector<double> knots;
@@ -374,9 +374,8 @@ public:
       lb[params_.intercept_col] = -std::numeric_limits<double>::infinity();
 
     Eigen::VectorXd x0 = Eigen::VectorXd::Zero(p);
-    TRROpts opts; opts.Delta0 = 1.0; opts.gtol = 1e-8; opts.max_iters = 200;
+    TRROpts opts; opts.Delta0 = 1.0; opts.gtol = 1e-8; opts.max_iters = 1000;
     TRRResult sol = trr_boxed_qp(q, lb, ub, x0, opts);
-
     // Predict + clamp
     std::vector<double> yhat(n);
     for (int i = 0; i < n; ++i) {
