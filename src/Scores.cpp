@@ -739,7 +739,7 @@ void Scores::calcPep(const bool spline, const bool interp, const bool pava) {
                     sc.push_back(sh.score);
                 }
             }
-            InferPEP reg(false);
+            InferPEP reg(!pava);
             auto target_pep = interp
                                 ? reg.qns_to_pep(target_q, sc)
                                 : reg.q_to_pep(target_q);

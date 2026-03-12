@@ -224,3 +224,22 @@ TEST_P(TdcToPepCalibrationTest, SparseHighScoreDecoys_DoNotForceLargeTailFloor) 
   ASSERT_EQ(top_target_count, 100);
   EXPECT_LT(top_target_sum / top_target_count, 0.05);
 }
+
+TEST(InferPepQValuePathTest, ISplineQnsToPepIsBoundedAndMonotone) {
+  std::vector<double> q_values = {
+      0.002, 0.002, 0.003, 0.004, 0.006, 0.009, 0.013, 0.018, 0.025, 0.033};
+  std::vector<double> scores = {
+      10.0, 9.0, 8.5, 7.5, 6.8, 6.0, 5.4, 4.7, 4.1, 3.5};
+
+  InferPEP infer(/*use_ispline=*/true);
+  auto pep = infer.qns_to_pep(q_values, scores);
+
+  ASSERT_EQ(pep.size(), q_values.size());
+  for (size_t i = 0; i < pep.size(); ++i) {
+    EXPECT_GE(pep[i], 0.0);
+    EXPECT_LE(pep[i], 1.0);
+    if (i > 0) {
+      EXPECT_LE(pep[i - 1], pep[i]);
+    }
+  }
+}

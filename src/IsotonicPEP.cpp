@@ -39,6 +39,9 @@ InferPEP::InferPEP(bool use_ispline)
 {
     if (use_ispline) {
         regressor_ptr_ = make_monotone_regressor(RegressorType::ISPLINE_TRR);
+        auto params = regressor_ptr_->params();
+        params.include_intercept = false;
+        regressor_ptr_->set_params(params);
         if (VERB > 1) {
             std::cerr << "Performing isotonic regression using I-Splines" << std::endl;
         }                
