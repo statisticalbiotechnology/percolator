@@ -220,6 +220,16 @@ inline double cubic_ispline_impl(double x, double left, double right) {
   return 3 * u * u - 2 * u * u * u;
 }
 
+inline double cubic_ispline_integral_impl(double x, double left, double right) {
+  if (x <= left) return 0.0;
+  const double width = right - left;
+  if (!(width > 0.0)) return 0.0;
+  if (x >= right) return 0.5 * width;
+
+  const double u = (x - left) / width;
+  return width * (u * u * u - 0.5 * u * u * u * u);
+}
+
 inline std::vector<double> normalize_to_unit_interval(const std::vector<double>& x) {
   if (x.empty()) return {};
 
@@ -236,6 +246,17 @@ inline std::vector<double> normalize_to_unit_interval(const std::vector<double>&
     out[i] = (x[i] - xmin) / span;
   }
   return out;
+}
+
+inline std::vector<double> normalized_rank_axis(size_t n) {
+  std::vector<double> u(n);
+  if (n == 0) return u;
+
+  const double inv_n = 1.0 / static_cast<double>(n);
+  for (size_t i = 0; i < n; ++i) {
+    u[i] = static_cast<double>(i + 1) * inv_n;
+  }
+  return u;
 }
 }
 
@@ -283,6 +304,100 @@ inline Eigen::MatrixXd build_ispline_design(
       double x = scores[i];
       double val = ispline_detail::cubic_ispline_impl(x, kj, kj1);
       X(i, col0 + j) = val;
+    }
+  }
+
+  return X;
+}
+
+inline Eigen::MatrixXd build_convex_q_design(
+    const std::vector<double>& u,
+    int /*degree*/,
+    const std::vector<double>& knots_in,
+    bool include_intercept)
+{
+  std::vector<double> knots = knots_in;
+  if (knots.size() < 2) {
+    double xmin = std::numeric_limits<double>::infinity();
+    double xmax = -std::numeric_limits<double>::infinity();
+    for (double s : u) { xmin = std::min(xmin, s); xmax = std::max(xmax, s); }
+    if (!std::isfinite(xmin) || !std::isfinite(xmax)) { xmin = 0.0; xmax = 1.0; }
+    if (xmax <= xmin) xmax = xmin + 1e-6;
+    knots = { xmin, xmax };
+  }
+  std::sort(knots.begin(), knots.end());
+  knots.erase(std::unique(knots.begin(), knots.end()), knots.end());
+  if (knots.size() < 2) {
+    double k0 = knots.empty() ? 0.0 : knots.front();
+    knots = { k0, k0 + 1e-6 };
+  }
+
+  const int n = static_cast<int>(u.size());
+  const int m = static_cast<int>(knots.size()) - 1;
+  const int p = m + 1 + (include_intercept ? 1 : 0); // intercept + linear slope + integrated I-splines
+
+  Eigen::MatrixXd X(n, p);
+  int col = 0;
+  if (include_intercept) {
+    X.col(col++).setOnes();
+  }
+
+  for (int i = 0; i < n; ++i) {
+    X(i, col) = u[i];
+  }
+  ++col;
+
+  for (int j = 0; j < m; ++j) {
+    const double kj = knots[j];
+    const double kj1 = knots[j + 1];
+    for (int i = 0; i < n; ++i) {
+      X(i, col + j) = ispline_detail::cubic_ispline_integral_impl(u[i], kj, kj1);
+    }
+  }
+
+  return X;
+}
+
+inline Eigen::MatrixXd build_convex_q_derivative_design(
+    const std::vector<double>& u,
+    int /*degree*/,
+    const std::vector<double>& knots_in,
+    bool include_intercept)
+{
+  std::vector<double> knots = knots_in;
+  if (knots.size() < 2) {
+    double xmin = std::numeric_limits<double>::infinity();
+    double xmax = -std::numeric_limits<double>::infinity();
+    for (double s : u) { xmin = std::min(xmin, s); xmax = std::max(xmax, s); }
+    if (!std::isfinite(xmin) || !std::isfinite(xmax)) { xmin = 0.0; xmax = 1.0; }
+    if (xmax <= xmin) xmax = xmin + 1e-6;
+    knots = { xmin, xmax };
+  }
+  std::sort(knots.begin(), knots.end());
+  knots.erase(std::unique(knots.begin(), knots.end()), knots.end());
+  if (knots.size() < 2) {
+    double k0 = knots.empty() ? 0.0 : knots.front();
+    knots = { k0, k0 + 1e-6 };
+  }
+
+  const int n = static_cast<int>(u.size());
+  const int m = static_cast<int>(knots.size()) - 1;
+  const int p = m + 1 + (include_intercept ? 1 : 0);
+
+  Eigen::MatrixXd X = Eigen::MatrixXd::Zero(n, p);
+  int col = 0;
+  if (include_intercept) {
+    ++col; // derivative of intercept is zero
+  }
+
+  X.col(col).setOnes(); // derivative of linear term u
+  ++col;
+
+  for (int j = 0; j < m; ++j) {
+    const double kj = knots[j];
+    const double kj1 = knots[j + 1];
+    for (int i = 0; i < n; ++i) {
+      X(i, col + j) = ispline_detail::cubic_ispline_impl(u[i], kj, kj1);
     }
   }
 
@@ -395,7 +510,119 @@ public:
     return fit_xy(x, y, clip_lo, clip_hi);
   }
 
+  std::vector<double> fit_q_xy(const std::vector<double>& x,
+                               const std::vector<double>& q_values,
+                               double clip_lo = 0.0, double clip_hi = 1.0) {
+    if (x.size() != q_values.size()) {
+      throw std::invalid_argument("ISplineTRRRegressor::fit_q_xy: x and q_values size mismatch");
+    }
+    if (q_values.empty()) {
+      return {};
+    }
+
+    std::vector<size_t> order(q_values.size());
+    std::iota(order.begin(), order.end(), 0);
+    const bool descending_x = params_.y_decreasing_in_x;
+    std::stable_sort(order.begin(), order.end(),
+                     [&](size_t lhs, size_t rhs) {
+                       if (x[lhs] == x[rhs]) {
+                         return lhs < rhs;
+                       }
+                       return descending_x ? (x[lhs] > x[rhs]) : (x[lhs] < x[rhs]);
+                     });
+
+    std::vector<double> q_sorted(q_values.size());
+    for (size_t i = 0; i < order.size(); ++i) {
+      q_sorted[i] = q_values[order[i]];
+    }
+
+    const auto pep_sorted = fit_q_sorted(q_sorted, clip_lo, clip_hi);
+    std::vector<double> out(q_values.size());
+    for (size_t i = 0; i < order.size(); ++i) {
+      out[order[i]] = pep_sorted[i];
+    }
+    return out;
+  }
+
+  std::vector<double> fit_q_y(const std::vector<double>& q_values,
+                              double clip_lo = 0.0, double clip_hi = 1.0) {
+    return fit_q_sorted(q_values, clip_lo, clip_hi);
+  }
+
   inline double cubic_ispline(double x, double left, double right) const {
     return ispline_detail::cubic_ispline_impl(x, left, right);
+  }
+
+private:
+  std::vector<double> fit_q_sorted(const std::vector<double>& q_values,
+                                   double clip_lo,
+                                   double clip_hi) const {
+    const int n = static_cast<int>(q_values.size());
+    if (n == 0) {
+      return {};
+    }
+
+    const std::vector<double> u = ispline_detail::normalized_rank_axis(q_values.size());
+    auto knots = params_.knots;
+    if (knots.empty()) {
+      knots = make_default_knots(u, params_.ispline_degree);
+    }
+
+    Eigen::MatrixXd Xq = build_convex_q_design(
+        u, params_.ispline_degree, knots, params_.include_intercept);
+    Eigen::MatrixXd Xdq = build_convex_q_derivative_design(
+        u, params_.ispline_degree, knots, params_.include_intercept);
+    const int p = static_cast<int>(Xq.cols());
+
+    const Eigen::Map<const Eigen::VectorXd> q_vec(q_values.data(), n);
+    const double inv_n = 1.0 / std::max(1, n);
+    QuadraticModel qobj;
+    qobj.G = inv_n * (Xq.transpose() * Xq);
+    qobj.h = inv_n * (Xq.transpose() * q_vec);
+    qobj.c = inv_n * q_vec.squaredNorm();
+
+    const double lambda = std::max(1e-2, params_.ridge_lambda);
+    if (lambda > 0.0) {
+      // Penalize the fitted slope directly so p(u) = q(u) + u q'(u) remains
+      // stable and does not spike on narrow spline intervals.
+      qobj.G += lambda * inv_n * (Xdq.transpose() * Xdq);
+
+      // Keep a light coefficient ridge as a numerical backstop.
+      qobj.G.diagonal().array() += 1e-8;
+      if (params_.include_intercept &&
+          params_.intercept_col >= 0 &&
+          params_.intercept_col < p) {
+        qobj.G(params_.intercept_col, params_.intercept_col) -= 1e-8;
+      }
+    }
+
+    Eigen::VectorXd lb = Eigen::VectorXd::Zero(p);
+    Eigen::VectorXd ub = Eigen::VectorXd::Constant(p, std::numeric_limits<double>::infinity());
+    if (params_.include_intercept && params_.intercept_col >= 0 && params_.intercept_col < p) {
+      lb[params_.intercept_col] = clip_lo;
+      ub[params_.intercept_col] = clip_hi;
+    }
+
+    Eigen::VectorXd x0 = Eigen::VectorXd::Zero(p);
+    if (params_.include_intercept && params_.intercept_col >= 0 && params_.intercept_col < p) {
+      x0[params_.intercept_col] = std::max(clip_lo, std::min(clip_hi, q_values.front()));
+    }
+
+    TRROpts opts;
+    opts.Delta0 = 1.0;
+    opts.gtol = 1e-8;
+    opts.max_iters = 1000;
+    TRRResult sol = trr_boxed_qp(qobj, lb, ub, x0, opts);
+
+    std::vector<double> pep(n);
+    for (int i = 0; i < n; ++i) {
+      const double qhat = Xq.row(i).dot(sol.x);
+      const double qprime = Xdq.row(i).dot(sol.x);
+      double local_pep = qhat + u[i] * qprime;
+      if (local_pep < clip_lo) local_pep = clip_lo;
+      if (local_pep > clip_hi) local_pep = clip_hi;
+      pep[i] = local_pep;
+    }
+    return pep;
   }
 };

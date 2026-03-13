@@ -14,6 +14,7 @@ using clock_type = std::chrono::high_resolution_clock;
 #include <Eigen/Sparse> 
 
 #include "MonotoneRegressor.h"
+#include "ISplineTRRRegressor.h"
 #include "IsotonicPEP.h"
 
 namespace {
@@ -52,6 +53,9 @@ InferPEP::InferPEP(bool use_ispline)
 
 std::vector<double> InferPEP::q_to_pep(const std::vector<double>& q_values) {
     qs = q_values;
+    if (auto* spline = dynamic_cast<ISplineTRRRegressor*>(regressor_ptr_.get())) {
+        return spline->fit_q_y(q_values);
+    }
     const std::vector<double> raw_pep = q_values_to_raw_pep(q_values);
     return regressor_ptr_->fit_y(raw_pep);
 }
@@ -61,6 +65,9 @@ std::vector<double> InferPEP::qns_to_pep(const std::vector<double>& q_values, co
       throw std::invalid_argument("InferPEP::qns_to_pep: q_values and scores size mismatch");
     }
     qs = q_values;
+    if (auto* spline = dynamic_cast<ISplineTRRRegressor*>(regressor_ptr_.get())) {
+      return spline->fit_q_xy(scores, q_values);
+    }
     const std::vector<double> raw_pep = q_values_to_raw_pep(q_values);
     return regressor_ptr_->fit_xy(scores, raw_pep);
 }

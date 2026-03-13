@@ -22,6 +22,12 @@ struct SynthData {
   std::vector<double> is_decoy; // 1 for decoy, 0 for target
 };
 
+struct QCurveData {
+  std::vector<double> q_values;
+  std::vector<double> pep_values;
+  std::vector<double> scores;
+};
+
 SynthData make_synth_data(unsigned seed = 1337) {
   const int n_block = 1000;
   const int N = 3 * n_block;
@@ -77,6 +83,36 @@ SynthData make_sparse_top_decoy_data(unsigned seed = 2025) {
   }
 
   return {scores, is_decoy};
+}
+
+QCurveData make_convex_q_curve_data(size_t n = 250) {
+  std::vector<double> q_values(n);
+  std::vector<double> pep_values(n);
+  std::vector<double> scores(n);
+
+  for (size_t i = 0; i < n; ++i) {
+    const double u = static_cast<double>(i + 1) / static_cast<double>(n);
+    const double q = 0.005 + 0.05 * u + 0.10 * u * u * u;
+    const double qp = 0.05 + 0.30 * u * u;
+    const double pep = q + u * qp;
+    q_values[i] = q;
+    pep_values[i] = pep;
+    scores[i] = static_cast<double>(n - i);
+  }
+
+  return {q_values, pep_values, scores};
+}
+
+void check_qvalue_consistency(const std::vector<double>& pep,
+                              const std::vector<double>& q_values,
+                              double abs_tol = 0.05) {
+  ASSERT_EQ(pep.size(), q_values.size());
+  double running_sum = 0.0;
+  for (size_t i = 0; i < pep.size(); ++i) {
+    running_sum += pep[i];
+    const double q_hat = running_sum / static_cast<double>(i + 1);
+    EXPECT_NEAR(q_hat, q_values[i], abs_tol) << "at index " << i;
+  }
 }
 
 // Given pep[i] for i=0..M-1 (aligned with scores/is_decoy),
@@ -223,4 +259,45 @@ TEST_P(TdcToPepCalibrationTest, SparseHighScoreDecoys_DoNotForceLargeTailFloor) 
 
   ASSERT_EQ(top_target_count, 100);
   EXPECT_LT(top_target_sum / top_target_count, 0.05);
+}
+
+TEST(InferPepQValuePathTest, ISplineQToPepRecoversConvexLocalRate) {
+  const auto data = make_convex_q_curve_data();
+  InferPEP infer(/*use_ispline=*/true);
+
+  const auto pep = infer.q_to_pep(data.q_values);
+
+  ASSERT_EQ(pep.size(), data.pep_values.size());
+  for (size_t i = 1; i < pep.size(); ++i) {
+    EXPECT_GE(pep[i], pep[i - 1]);
+  }
+
+  check_qvalue_consistency(pep, data.q_values);
+}
+
+TEST(InferPepQValuePathTest, ISplineQnsToPepUsesScoreOrderAndMapsBack) {
+  auto data = make_convex_q_curve_data();
+  InferPEP infer(/*use_ispline=*/true);
+  const auto pep_reference = infer.q_to_pep(data.q_values);
+
+  std::vector<size_t> perm(data.q_values.size());
+  std::iota(perm.begin(), perm.end(), 0);
+  std::mt19937 rng(17);
+  std::shuffle(perm.begin(), perm.end(), rng);
+
+  std::vector<double> q_perm(perm.size());
+  std::vector<double> score_perm(perm.size());
+  std::vector<double> pep_expected(perm.size());
+  for (size_t i = 0; i < perm.size(); ++i) {
+    q_perm[i] = data.q_values[perm[i]];
+    score_perm[i] = data.scores[perm[i]];
+    pep_expected[i] = pep_reference[perm[i]];
+  }
+
+  const auto pep = infer.qns_to_pep(q_perm, score_perm);
+
+  ASSERT_EQ(pep.size(), pep_expected.size());
+  for (size_t i = 0; i < pep.size(); ++i) {
+    EXPECT_NEAR(pep[i], pep_expected[i], 1e-9) << "at permuted index " << i;
+  }
 }
