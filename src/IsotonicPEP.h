@@ -29,6 +29,7 @@ class InferPEP {
         
     private:
         std::unique_ptr<MonotoneRegressor> regressor_ptr_;
+        bool use_ispline_;
         std::vector<double> qs;
         // std::vector<double> pep_iso;
     };

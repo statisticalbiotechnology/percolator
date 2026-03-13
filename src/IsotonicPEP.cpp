@@ -33,9 +33,24 @@ std::vector<double> q_values_to_raw_pep(const std::vector<double>& q_values) {
   }
   return raw_pep;
 }
+
+std::vector<double> smooth_q_values_to_pep(
+    MonotoneRegressor* regressor,
+    const std::vector<double>& q_values,
+    const std::vector<double>* scores = nullptr) {
+  const std::vector<double> fitted_q = scores
+      ? regressor->fit_xy(*scores, q_values, /*clip_lo=*/0.0, /*clip_hi=*/1.0)
+      : regressor->fit_y(q_values,          /*clip_lo=*/0.0, /*clip_hi=*/1.0);
+
+  std::vector<double> pep = q_values_to_raw_pep(fitted_q);
+  for (double& p : pep) {
+    p = std::max(0.0, std::min(1.0, p));
+  }
+  return pep;
+}
 }  // namespace
 
-InferPEP::InferPEP(bool use_ispline)
+InferPEP::InferPEP(bool use_ispline) : use_ispline_(use_ispline)
 {
     if (use_ispline) {
         regressor_ptr_ = make_monotone_regressor(RegressorType::ISPLINE_TRR);
@@ -55,6 +70,9 @@ InferPEP::InferPEP(bool use_ispline)
 
 std::vector<double> InferPEP::q_to_pep(const std::vector<double>& q_values) {
     qs = q_values;
+    if (use_ispline_) {
+        return smooth_q_values_to_pep(regressor_ptr_.get(), q_values);
+    }
     const std::vector<double> raw_pep = q_values_to_raw_pep(q_values);
     return regressor_ptr_->fit_y(raw_pep);
 }
@@ -64,6 +82,9 @@ std::vector<double> InferPEP::qns_to_pep(const std::vector<double>& q_values, co
       throw std::invalid_argument("InferPEP::qns_to_pep: q_values and scores size mismatch");
     }
     qs = q_values;
+    if (use_ispline_) {
+      return smooth_q_values_to_pep(regressor_ptr_.get(), q_values, &scores);
+    }
     const std::vector<double> raw_pep = q_values_to_raw_pep(q_values);
     return regressor_ptr_->fit_xy(scores, raw_pep);
 }

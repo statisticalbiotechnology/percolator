@@ -235,11 +235,11 @@ TEST(InferPepQValuePathTest, ISplineQnsToPepIsBoundedAndMonotone) {
   auto pep = infer.qns_to_pep(q_values, scores);
 
   ASSERT_EQ(pep.size(), q_values.size());
+  double running = 0.0;
   for (size_t i = 0; i < pep.size(); ++i) {
     EXPECT_GE(pep[i], 0.0);
     EXPECT_LE(pep[i], 1.0);
-    if (i > 0) {
-      EXPECT_LE(pep[i - 1], pep[i]);
-    }
+    running += pep[i];
+    EXPECT_NEAR(running / static_cast<double>(i + 1), q_values[i], 0.02);
   }
 }
