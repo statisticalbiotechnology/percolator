@@ -92,7 +92,7 @@ InferPEP::tdc_to_pep(const std::vector<double>& is_decoy,
     // a positive floor from sparse decoys deeper in the list.
     const auto mm = std::minmax_element(sc.begin(), sc.end());
     const double score_span = *mm.second - *mm.first;
-    const double delta = std::max(1.0, score_span * 1e-6);
+    const double delta = std::max(score_span * 1e-6, 1e-12);
     sc.insert(sc.begin(), *mm.second + delta);
     is_dec.insert(is_dec.begin(), 0.0);
   } else {
