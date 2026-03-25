@@ -213,12 +213,6 @@ inline TRRResult trr_boxed_qp(const QuadraticModel& q,
 }
 
 namespace ispline_detail {
-inline double cubic_ispline_impl(double x, double left, double right) {
-  if (x < left) return 0.0;
-  if (x >= right) return 1.0;
-  double u = (x - left) / (right - left);
-  return 3 * u * u - 2 * u * u * u;
-}
 
 inline std::vector<double> normalize_to_unit_interval(const std::vector<double>& x) {
   if (x.empty()) return {};
@@ -237,52 +231,110 @@ inline std::vector<double> normalize_to_unit_interval(const std::vector<double>&
   }
   return out;
 }
-}
 
+} // namespace ispline_detail
+
+// Build I-spline design matrix from proper B-spline basis.
+//
+// I-spline columns are cumulative tail sums of B-splines:
+//   I_j(x) = sum_{m >= j} B_m(x),  j = 1, ..., n_bspline-1
+// With clamped (repeated) boundary knots, each I_j is a smooth monotone
+// function from 0 to 1 spanning multiple knot intervals.  Non-negative
+// coefficients on these columns guarantee a monotone non-decreasing fit.
+//
+// B-splines are evaluated via the de Boor triangular recursion (O(d^2)
+// per data point, independent of the number of basis functions).
+//
+// The knot vector must be a clamped B-spline knot vector: degree+1
+// copies of the left boundary, sorted internal knots, degree+1 copies
+// of the right boundary.
 inline Eigen::MatrixXd build_ispline_design(
     const std::vector<double>& scores,
-    int /*degree*/,
-    const std::vector<double>& knots_in,
+    int degree,
+    const std::vector<double>& knots,
     bool include_intercept)
 {
-  // Copy + sanitize knots: sort, unique, ensure at least two
-  std::vector<double> knots = knots_in;
-  if (knots.size() < 2) {
-    // Derive a minimal knot span from data
-    double xmin = std::numeric_limits<double>::infinity();
-    double xmax = -std::numeric_limits<double>::infinity();
-    for (double s : scores) { xmin = std::min(xmin, s); xmax = std::max(xmax, s); }
-    if (!std::isfinite(xmin) || !std::isfinite(xmax)) { xmin = 0.0; xmax = 1.0; }
-    if (xmax <= xmin) xmax = xmin + 1e-6; // avoid zero width
-    knots = { xmin, xmax };
-  }
-  std::sort(knots.begin(), knots.end());
-  knots.erase(std::unique(knots.begin(), knots.end()), knots.end());
-  if (knots.size() < 2) {
-    // If still < 2 after unique, expand slightly
-    double k0 = knots.empty() ? 0.0 : knots.front();
-    knots = { k0, k0 + 1e-6 };
-  }
-
   const int n = static_cast<int>(scores.size());
-  const int m = static_cast<int>(knots.size()) - 1; // number of intervals/bases
-  const int p = m + (include_intercept ? 1 : 0);
+  const int n_knots = static_cast<int>(knots.size());
+  const int n_bspline = n_knots - degree - 1;
+  const int d = degree;
 
-  Eigen::MatrixXd X(n, p);
+  if (n_bspline <= 1) {
+    Eigen::MatrixXd X(n, 1);
+    X.setOnes();
+    return X;
+  }
+
+  const int n_ispline = n_bspline - 1;
+  const int p = (include_intercept ? 1 : 0) + n_ispline;
+  Eigen::MatrixXd X = Eigen::MatrixXd::Zero(n, p);
+
   int col0 = 0;
   if (include_intercept) {
     X.col(0).setOnes();
     col0 = 1;
   }
 
-  for (int j = 0; j < m; ++j) {
-    const double kj   = knots[j];
-    const double kj1  = knots[j+1];
-    const double wid  = std::max(1e-12, kj1 - kj); // protect against zero width
-    for (int i = 0; i < n; ++i) {
-      double x = scores[i];
-      double val = ispline_detail::cubic_ispline_impl(x, kj, kj1);
-      X(i, col0 + j) = val;
+  const double* t = knots.data();
+
+  for (int i = 0; i < n; ++i) {
+    double x = scores[i];
+
+    // Find knot span k: t[k] <= x < t[k+1], clamped to valid range [d, n_knots-d-2]
+    int k;
+    if (x >= t[n_knots - d - 1]) {
+      k = n_knots - d - 2;
+    } else if (x <= t[d]) {
+      k = d;
+    } else {
+      int lo = d, hi = n_knots - d - 1;
+      while (lo < hi) {
+        int mid = (lo + hi) / 2;
+        if (t[mid + 1] <= x) lo = mid + 1;
+        else hi = mid;
+      }
+      k = lo;
+    }
+
+    // De Boor triangular recursion: compute B_{k-d}(x), ..., B_k(x)
+    double B[32]; // supports degree up to 31
+    B[0] = 1.0;
+    for (int j = 1; j <= d; ++j) {
+      double saved = 0.0;
+      for (int r = 0; r < j; ++r) {
+        double left_val  = x - t[k + 1 - j + r];
+        double right_val = t[k + 1 + r] - x;
+        double denom = left_val + right_val;
+        double temp = (denom > 0.0) ? B[r] / denom : 0.0;
+        B[r] = saved + right_val * temp;
+        saved = left_val * temp;
+      }
+      B[j] = saved;
+    }
+    // B[r] == B_{k-d+r, d}(x)  for r = 0, ..., d
+
+    // Cumulative sum from right: cum[r] = sum_{s=r}^{d} B[s]
+    double cum[32];
+    cum[d] = B[d];
+    for (int r = d - 1; r >= 0; --r) {
+      cum[r] = cum[r + 1] + B[r];
+    }
+
+    // Fill I-spline columns.
+    // I_j(x) = sum_{m >= j} B_m(x)  for j = 1 .. n_bspline-1
+    //   = 1           if j <= k-d    (all non-zero B-splines included)
+    //   = cum[j-(k-d)] if k-d < j <= k (partial sum of non-zero B-splines)
+    //   = 0           if j > k        (no non-zero B-splines included)
+    for (int j = 1; j < n_bspline; ++j) {
+      double val;
+      if (j <= k - d) {
+        val = 1.0;
+      } else if (j > k) {
+        val = 0.0;
+      } else {
+        val = cum[j - (k - d)];
+      }
+      X(i, col0 + j - 1) = val;
     }
   }
 
@@ -290,38 +342,42 @@ inline Eigen::MatrixXd build_ispline_design(
 }
 
 
+// Build a clamped B-spline knot vector with degree+1 repeated boundary
+// knots and internal knots placed at data quantiles.
 static std::vector<double> make_default_knots(const std::vector<double>& scores, int degree) {
   const int n = (int)scores.size();
   if (n == 0) return {};
 
-  // 1. Sort copy of scores
   std::vector<double> sorted = scores;
   std::sort(sorted.begin(), sorted.end());
 
-  // 2. Boundaries
   double lo = sorted.front();
   double hi = sorted.back();
+  if (hi <= lo) hi = lo + 1e-6;
 
-  // 3. Number of internal knots
-  int num_knots = std::min(200, (int)std::sqrt(n));
+  int num_internal = std::min(200, (int)std::sqrt(n));
 
-  // 4. Place them at equally spaced quantiles
+  // Place internal knots at quantiles, skipping duplicates and boundaries
+  std::vector<double> internal;
+  internal.reserve(num_internal);
+  double prev = lo;
+  for (int k = 1; k <= num_internal; ++k) {
+    double q = (double)k / (num_internal + 1);
+    size_t idx = std::min((size_t)(q * (n - 1)), (size_t)(n - 1));
+    double val = sorted[idx];
+    if (val > lo + 1e-12 && val < hi - 1e-12 && val > prev + 1e-12) {
+      internal.push_back(val);
+      prev = val;
+    }
+  }
+
+  // Clamped knot vector: (degree+1) copies of lo, internal knots, (degree+1) copies of hi
+  const int order = degree + 1;
   std::vector<double> knots;
-  knots.reserve(num_knots + 2* (degree+1));
-  knots.push_back(lo);
-  for (int k = 1; k <= num_knots; ++k) {
-    double q = (double)k / (num_knots+1); // exclude endpoints
-    size_t idx = (size_t)(q * (n-1));
-    knots.push_back(sorted[idx]);
-  }
-  knots.push_back(hi);
-
-  // 5. Depending on your basis implementation, you may need to pad
-  //    the boundary knots 'degree' times on each side.
-  for (int d = 0; d < degree; ++d) {
-    knots.insert(knots.begin(), lo);
-    knots.push_back(hi);
-  }
+  knots.reserve(2 * order + (int)internal.size());
+  for (int i = 0; i < order; ++i) knots.push_back(lo);
+  for (double v : internal) knots.push_back(v);
+  for (int i = 0; i < order; ++i) knots.push_back(hi);
 
   return knots;
 }
@@ -355,7 +411,8 @@ public:
     const int p = (int)X.cols();
 
     // Precompute normal-equation terms for objective:
-    // ||X beta - y||^2 + lambda ||beta||^2
+    // (1/n)||X beta - y||^2 + lambda_ridge ||beta||^2 + lambda_smooth ||D beta_spline||^2
+    // where D is the second-difference matrix on the I-spline coefficients.
     const Eigen::Map<const Eigen::VectorXd> y_vec(y.data(), n);
     const double inv_n = 1.0 / std::max(1, n);
     QuadraticModel q;
@@ -365,6 +422,23 @@ public:
     const double lambda = std::max(0.0, params_.ridge_lambda);
     if (lambda > 0.0) {
       q.G.diagonal().array() += lambda;
+    }
+
+    // Second-difference smoothing penalty on I-spline coefficients.
+    // Penalizes curvature (gamma_{j+2} - 2*gamma_{j+1} + gamma_j)^2,
+    // encouraging smooth transitions instead of step functions.
+    const int col0_s = params_.include_intercept ? 1 : 0;
+    const int n_ispline = p - col0_s;
+    const double smooth_lambda = std::max(0.0, params_.smooth_lambda);
+    if (smooth_lambda > 0.0 && n_ispline > 2) {
+      const int nd = n_ispline - 2;
+      Eigen::MatrixXd D = Eigen::MatrixXd::Zero(nd, p);
+      for (int di = 0; di < nd; ++di) {
+        D(di, col0_s + di)     =  1.0;
+        D(di, col0_s + di + 1) = -2.0;
+        D(di, col0_s + di + 2) =  1.0;
+      }
+      q.G += smooth_lambda * (D.transpose() * D);
     }
 
     // Bounds: non-negative except possibly intercept
@@ -395,7 +469,4 @@ public:
     return fit_xy(x, y, clip_lo, clip_hi);
   }
 
-  inline double cubic_ispline(double x, double left, double right) const {
-    return ispline_detail::cubic_ispline_impl(x, left, right);
-  }
 };

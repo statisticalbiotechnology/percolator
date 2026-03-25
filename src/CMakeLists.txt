@@ -179,7 +179,8 @@ add_library(perclibrary STATIC BaseSpline.cpp MassHandler.cpp ResultHolder.cpp P
 if(OpenMP_CXX_FOUND)
   target_link_libraries(perclibrary PUBLIC ${COMMON_LIBRARIES} OpenMP::OpenMP_CXX)
 else()
-  target_link_libraries(perclibrary PUBLIC ${COMMON_LIBRARIES} EIGEN_DONT_PARALLELIZE)
+  target_link_libraries(perclibrary PUBLIC ${COMMON_LIBRARIES})
+  target_compile_definitions(perclibrary PUBLIC EIGEN_DONT_PARALLELIZE)
 endif()
 
 ###############################################################################

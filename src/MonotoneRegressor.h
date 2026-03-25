@@ -3,8 +3,9 @@
 #include <memory>
 
 
-// Constants for tuning (Point 7)
-constexpr double DEFAULT_LAMBDA = 1e-6;
+// Constants for tuning
+constexpr double DEFAULT_LAMBDA = 1e-4;
+constexpr double DEFAULT_SMOOTH_LAMBDA = 1e-3;
 constexpr int DEFAULT_NUM_KNOTS = 50;
 constexpr double DEFAULT_SKEW_FACTOR = 0.75;
 
@@ -15,6 +16,7 @@ struct MonotoneParams {
   double clip_hi = 1.0;
   // I-spline TRR specific
   double ridge_lambda = DEFAULT_LAMBDA;
+  double smooth_lambda = DEFAULT_SMOOTH_LAMBDA;
   bool y_decreasing_in_x = true;
   int ispline_degree = 3;
   bool include_intercept = true;

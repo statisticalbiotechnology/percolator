@@ -52,8 +52,16 @@ InferPEP::InferPEP(bool use_ispline)
 
 std::vector<double> InferPEP::q_to_pep(const std::vector<double>& q_values) {
     qs = q_values;
-    const std::vector<double> raw_pep = q_values_to_raw_pep(q_values);
-    return regressor_ptr_->fit_y(raw_pep);
+    std::vector<double> raw_pep = q_values_to_raw_pep(q_values);
+    // Bayesian pseudocount: spread half a false discovery uniformly across
+    // all peptides.  This prevents exact-zero PEPs in the leading tail
+    // (where q = 0) and gives the monotone smoother something to fit.
+    if (!raw_pep.empty()) {
+      const double pseudo = 0.5 / static_cast<double>(raw_pep.size());
+      for (auto& v : raw_pep) v += pseudo;
+    }
+    const double eps = 1e-10;
+    return regressor_ptr_->fit_y(raw_pep, /*clip_lo=*/eps);
 }
 
 std::vector<double> InferPEP::qns_to_pep(const std::vector<double>& q_values, const std::vector<double>& scores) {
@@ -61,8 +69,13 @@ std::vector<double> InferPEP::qns_to_pep(const std::vector<double>& q_values, co
       throw std::invalid_argument("InferPEP::qns_to_pep: q_values and scores size mismatch");
     }
     qs = q_values;
-    const std::vector<double> raw_pep = q_values_to_raw_pep(q_values);
-    return regressor_ptr_->fit_xy(scores, raw_pep);
+    std::vector<double> raw_pep = q_values_to_raw_pep(q_values);
+    if (!raw_pep.empty()) {
+      const double pseudo = 0.5 / static_cast<double>(raw_pep.size());
+      for (auto& v : raw_pep) v += pseudo;
+    }
+    const double eps = 1e-10;
+    return regressor_ptr_->fit_xy(scores, raw_pep, /*clip_lo=*/eps);
 }
 
 std::vector<double>

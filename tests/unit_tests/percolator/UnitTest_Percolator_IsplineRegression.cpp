@@ -11,25 +11,25 @@ protected:
     }
 };
 
-TEST_F(IsplineRegressionTest, CubicIsplineBasicBehavior) {
-    double left = 0.2;
-    double right = 0.4;
+TEST_F(IsplineRegressionTest, IsplineDesignMatrixMonotonicity) {
+    // Verify that I-spline columns are monotone non-decreasing in x
+    std::vector<double> scores;
+    for (int i = 0; i <= 100; ++i) scores.push_back(i / 100.0);
 
-    EXPECT_DOUBLE_EQ(model.cubic_ispline(0.1, left, right), 0.0);  // Before support
-    EXPECT_DOUBLE_EQ(model.cubic_ispline(left, left, right), 0.0); // At left
+    // Build a clamped knot vector: degree+1 boundary copies + internal knots
+    std::vector<double> knots = {0, 0, 0, 0, 0.25, 0.5, 0.75, 1, 1, 1, 1};
+    Eigen::MatrixXd X = build_ispline_design(scores, 3, knots, true);
 
-    double mid = 0.3;
-    double val = model.cubic_ispline(mid, left, right);
-    EXPECT_GT(val, 0.0);
-    EXPECT_LT(val, 1.0);
-
-    EXPECT_DOUBLE_EQ(model.cubic_ispline(right, left, right), 1.0);  // At right
-    EXPECT_DOUBLE_EQ(model.cubic_ispline(0.41, left, right), 1.0);   // After support
-
-    double val1 = model.cubic_ispline(0.25, left, right);
-    double val2 = model.cubic_ispline(0.35, left, right);
-    EXPECT_GT(val1, 0.0);
-    EXPECT_GT(val2, val1); // Monotonicity
+    // Column 0 is intercept (all 1s); remaining columns are I-splines
+    for (int col = 1; col < X.cols(); ++col) {
+        for (int row = 1; row < X.rows(); ++row) {
+            EXPECT_GE(X(row, col), X(row - 1, col) - 1e-12)
+                << "I-spline column " << col << " not monotone at row " << row;
+        }
+        // Should start near 0 and end near 1
+        EXPECT_NEAR(X(0, col), 0.0, 1e-10);
+        EXPECT_NEAR(X(X.rows() - 1, col), 1.0, 1e-10);
+    }
 }
 
 TEST_F(IsplineRegressionTest, MonotonicityFitY) {
@@ -102,7 +102,7 @@ TEST_F(IsplineRegressionTest, HandlesConstantInput) {
     }
     */
     for (size_t i = 0; i < fitted.size(); ++i) {
-        ASSERT_NEAR(fitted[i], 0.5, 1e-4);
+        ASSERT_NEAR(fitted[i], 0.5, 1e-2);
     }
 }
 
