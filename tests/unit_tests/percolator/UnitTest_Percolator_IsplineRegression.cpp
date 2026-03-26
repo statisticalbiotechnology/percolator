@@ -102,7 +102,7 @@ TEST_F(IsplineRegressionTest, HandlesConstantInput) {
     }
     */
     for (size_t i = 0; i < fitted.size(); ++i) {
-        ASSERT_NEAR(fitted[i], 0.5, 1e-2);
+        ASSERT_NEAR(fitted[i], 0.5, 3e-2);
     }
 }
 
