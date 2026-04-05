@@ -31,9 +31,7 @@ echo "The Builder $0 is building the Percolator packages with src=${src_dir} and
 whoami
 
 sudo dnf -y install gcc gcc-c++ wget rpm-build cmake
-sudo dnf install sqlite-devel zlib-devel bzip2-devel
-sudo dnf install tokyocabinet-devel xerces-c-devel
-sudo dnf install libtirpc libtirpc-devel
+sudo dnf install zlib-devel bzip2-devel
 sudo dnf -y --enablerepo=powertools install gtest
 
 cd ${src_dir}
@@ -57,61 +55,20 @@ else
   sudo yum install -y boost-static boost-devel
 fi
 
-# download and install xsd
-
-if hash xsdcxx 2>/dev/null; then
-  echo "  XSD has been installed previously, remove if you want a clean install"
-else
-  echo "  Installing XSD"
-  wget --quiet ${centos_xsd_url}
-  rpm -ivh ${centos_xsd}.rpm
-fi
-
 # download, compile and link percolator
 
 echo "Installing percolator"
 
-echo "cmake percolator-noxml (without XML support) ....."
-mkdir -p ${build_dir}/percolator-noxml
-cd ${build_dir}/percolator-noxml
+echo "cmake percolator ....."
+mkdir -p ${build_dir}/percolator
+cd ${build_dir}/percolator
 (set -x; \
-cmake -DTARGET_ARCH=x86_64 -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_PREFIX_PATH="${build_dir}/${centos_boost}" -DXML_SUPPORT=OFF ${src_dir}/percolator; \
+cmake -DTARGET_ARCH=x86_64 -DCMAKE_BUILD_TYPE=Release -DGOOGLE_TEST=1 -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_PREFIX_PATH="${build_dir}/${centos_boost}" ${src_dir}/percolator; \
 )
 make -j 4
-make -j 4 package
-
-# Fix to handle alt. rpc location
-# export CFLAGS=`pkg-config --cflags libtirpc`
-# export CXXFLAGS=-I/usr/include/tirpc
-
-echo -n "cmake percolator (with XML support) .....";
-mkdir -p ${build_dir}/percolator;
-cd ${build_dir}/percolator;
-(set -x; \
-cmake -DTARGET_ARCH=x86_64 -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_PREFIX_PATH="${build_dir}/${centos_boost}" -DXML_SUPPORT=ON ${src_dir}/percolator; \
-)
-make -j 4;
-make -j 4 package
-
-#-----cmake-----
-echo -n "cmake percolator-test (for container builds, that do not have write permission to /usr/bin) ....."
-mkdir -p ${build_dir}/percolator-test
-cd $build_dir/percolator-test
-(set -x; \
-cmake -DTARGET_ARCH=amd64 -DCMAKE_BUILD_TYPE=Release -DGOOGLE_TEST=1 -DCMAKE_INSTALL_PREFIX=./local-usr -DCMAKE_PREFIX_PATH="${build_dir}/${centos_boost}" -DXML_SUPPORT=ON ${src_dir}/percolator; \
-)
-#-----make------
-make -j 4
-
-
-mkdir -p ${build_dir}/converters
-cd ${build_dir}/converters
-(set -x; \
-cmake -DTARGET_ARCH=x86_64 -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_PREFIX_PATH="${build_dir}/${centos_boost}" -DSERIALIZE="TokyoCabinet" ${src_dir}/percolator/src/converters; \
-)
-make -j 4
+make test
 make -j 4 package
 
 echo "build directory was : ${build_dir}"
 
-cp -v ${build_dir}/{percolator-noxml,percolator,converters}/*.rpm ${release_dir}
+cp -v ${build_dir}/percolator*.rpm ${release_dir}

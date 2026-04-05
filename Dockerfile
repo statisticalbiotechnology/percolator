@@ -1,5 +1,5 @@
 FROM docker.io/library/ubuntu:24.04 AS builder
-ARG percolator_cmake_args="-DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr -DGOOGLE_TEST=0 -DXML_SUPPORT=OFF"
+ARG percolator_cmake_args="-DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr -DGOOGLE_TEST=0"
 
 RUN apt-get update && apt-get install -y 
 
@@ -17,9 +17,9 @@ RUN apt-get install -y \
 COPY / /percolator
 
 RUN mkdir -p /release /build
-RUN mkdir -p /build/percolator-noxml /build/percolator /build/converters;
+RUN mkdir -p /build/percolator;
 
-WORKDIR /build/percolator-noxml
+WORKDIR /build/percolator
 
 RUN cmake ${percolator_cmake_args} /percolator
 RUN make
@@ -30,10 +30,6 @@ FROM docker.io/library/ubuntu:24.04 AS runtime
 RUN apt-get update && apt-get install -y \
     libboost-system-dev \
     libboost-filesystem-dev \
-    libboost-thread-dev \
-    libbz2-1.0 \
-    libcurl4-openssl-dev \
-    libgomp1 \
-    zlib1g
+    libboost-thread-dev
 
 COPY --from=builder /usr/bin/percolator /usr/bin/percolator

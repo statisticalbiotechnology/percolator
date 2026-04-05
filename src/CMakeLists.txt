@@ -9,63 +9,100 @@ include_directories(${CMAKE_CURRENT_BINARY_DIR})
 
 MESSAGE( STATUS "Checking packages:" )
 
-if(XML_SUPPORT)
-  find_package(XercesC REQUIRED) # XSD DEPENDS ON ${XERCESC_FOUND}
-  if(XERCESC_FOUND)
-    message(STATUS "Found Xerces-C: ${XERCESC_LIBRARIES}")
-    message(STATUS "              : ${XERCESC_INCLUDE_DIR}")
-    message(STATUS "       Version: ${XERCESC_VERSION}")
-  else(XERCESC_FOUND)
-    message(FATAL_ERROR "The package Apache Xerces-C++ has not been found")
-  endif(XERCESC_FOUND)
-  include_directories(${XERCESC_INCLUDE_DIR})
-
-  find_package(Threads REQUIRED) # XERCESC depends on pthread
-
-  if(APPLE OR MINGW)
-    find_package(CURL REQUIRED) # XERCESC depends on curl
+set(COMMON_LIBRARIES "")
+find_package(OpenMP)
+# Help AppleClang find Homebrew's libomp if not auto-detected
+if(APPLE AND NOT OpenMP_CXX_FOUND)
+  # Common Homebrew prefix on Apple Silicon
+  set(_HOMEBREW_OMP_ROOT "/opt/homebrew/opt/libomp")
+  if (EXISTS "${_HOMEBREW_OMP_ROOT}/include" AND EXISTS "${_HOMEBREW_OMP_ROOT}/lib")
+    # Hint include/lib to CMake's OpenMP finder
+    set(OpenMP_CXX_FLAGS "-Xpreprocessor -fopenmp" CACHE STRING "" FORCE)
+    set(OpenMP_CXX_LIB_NAMES "omp" CACHE STRING "" FORCE)
+    set(OpenMP_omp_LIBRARY "${_HOMEBREW_OMP_ROOT}/lib/libomp.dylib" CACHE FILEPATH "" FORCE)
+    include_directories("${_HOMEBREW_OMP_ROOT}/include")
+    # Retry discovery
+    find_package(OpenMP)
   endif()
+endif()
+if (OpenMP_CXX_FOUND)
+    list(APPEND COMMON_LIBRARIES OpenMP::OpenMP_CXX)
+endif()
 
-  message(STATUS "Locating CodeSynthesis library with XSDDIR set to $ENV{XSDDIR}")
-  find_package(Xsd REQUIRED) # CODESYNTHESIS
-  if(XSD_FOUND)
-    message(STATUS "Package CodeSynthesis XSD found: ${XSD_INCLUDE_DIR}, ${XSD_EXECUTABLE}")
-  else(XSD_FOUND)
-    message(FATAL_ERROR "The package CodeSynthesis XSD has not been found")
-  endif(XSD_FOUND)
-  include_directories(${XSD_INCLUDE_DIR})
 
-  if(UNIX)
-      set(CMAKE_PREFIX_PATH ${RPCDIR})
-      find_package(RPC QUIET)
-      set(HAVE_RPC ${RPC_FOUND})
-      if(RPC_FOUND)
-          message(STATUS "RPC found, will include headers from: ${RPC_INCLUDE_DIR}")
-          message(STATUS "and libraries from                  : ${RPC_LIBRARIES}")
-          set(LIBRARIES ${LIBRARIES} ${RPC_LIBRARIES})
-          include_directories(${RPC_INCLUDE_DIR})
-      else(RPC_FOUND)
-          message(FATAL_ERROR "RPC support is mandatory.\n"
-          "Note that SunRPC has been removed in glibc-2.26 and later, "
-          "while being optional in earlier versions. Consider using the "
-          "recommended and more modern libtirpc instead.\n"
-          "Use -DRPCDIR=DIR to specify the rpc directory tree.\n")
-      endif(RPC_FOUND)
-  endif()
-endif(XML_SUPPORT)
 
-if(APPLE AND OPENMP_FOUND)
-  include_directories(${OpenMP_CXX_INCLUDE_DIRS})
-endif(APPLE AND OPENMP_FOUND)
+# Make find_package honor UPPER-CASE <PKG>_ROOT vars like BOOST_ROOT (CMake 3.30+)
+if(POLICY CMP0074)
+  cmake_policy(SET CMP0074 NEW)
+endif()
+if(POLICY CMP0144)
+  cmake_policy(SET CMP0144 NEW)
+endif()
+if(POLICY CMP0167)
+  cmake_policy(SET CMP0167 OLD)
+endif()
+if(POLICY CMP0169)
+  cmake_policy(SET CMP0169 NEW)
+endif()
+if(POLICY CMP0177)
+  cmake_policy(SET CMP0177 NEW)
+endif()
 
-# Boost header libraries only for async io header library (asio.hpp)
-find_package(Boost ${BOOST_MIN_VERSION} COMPONENTS filesystem system REQUIRED)
+
+
+# --- Boost configuration (platform-aware) ---
+# We mostly want static, but Homebrew on macOS ships only dynamic libs.
+if(APPLE)
+  set(Boost_USE_STATIC_LIBS OFF)
+  set(Boost_USE_MULTITHREADED ON)
+elseif(MSVC)
+  set(Boost_USE_STATIC_LIBS ON)
+  set(Boost_USE_MULTITHREADED ON)
+else()
+  set(Boost_USE_STATIC_LIBS ON)
+  set(Boost_USE_MULTITHREADED ON)
+endif()
+
+# Prefer Boost's classic FindBoost over boost-cmake configs
+set(Boost_NO_BOOST_CMAKE ON CACHE BOOL "" FORCE)
+
+# Require the components you actually use
+if(APPLE)
+  find_package(Boost ${BOOST_MIN_VERSION} COMPONENTS filesystem REQUIRED)
+else()
+  find_package(Boost ${BOOST_MIN_VERSION} COMPONENTS filesystem system REQUIRED)
+endif()
+
 add_definitions(-DBOOST_SYSTEM_NO_DEPRECATED)
 add_definitions(-DBOOST_ERROR_CODE_HEADER_ONLY)
+
 if(WIN32)
   add_definitions(-DBOOST_ALL_NO_LIB) # disable autolinking in boost
-endif(WIN32)
+endif()
+
 include_directories(${Boost_INCLUDE_DIRS})
+list(APPEND COMMON_LIBRARIES Boost::filesystem)
+if(NOT APPLE)
+  list(APPEND COMMON_LIBRARIES Boost::system)
+endif()
+
+if(MSVC)
+  add_definitions (/MP /D _CRT_SECURE_NO_WARNINGS /D _CRT_NONSTDC_NO_DEPRECATE)
+endif(MSVC)
+option(USE_MSVC_STATIC_RUNTIME "Link MSVC runtime statically (/MT)" ON)
+if (MSVC AND USE_MSVC_STATIC_RUNTIME)
+  foreach(flag_var CMAKE_C_FLAGS CMAKE_C_FLAGS_DEBUG CMAKE_C_FLAGS_RELEASE
+                   CMAKE_CXX_FLAGS CMAKE_CXX_FLAGS_DEBUG CMAKE_CXX_FLAGS_RELEASE)
+    if(${flag_var} MATCHES "/MD")
+      string(REPLACE "/MD" "/MT" ${flag_var} "${${flag_var}}")
+    endif()
+  endforeach()
+  set(Boost_USE_STATIC_RUNTIME ON)  # match Boost to the CRT choice
+endif()
+
+find_package(Threads REQUIRED)
+list(APPEND COMMON_LIBRARIES Threads::Threads)
+
 
 #########################################
 # COMPILE BLAS
@@ -85,6 +122,12 @@ set(EIGEN_BUILD_TESTING OFF CACHE BOOL "" FORCE)
 set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
 set(EIGEN_BUILD_DOC OFF CACHE BOOL "" FORCE)
 set(EIGEN_BUILD_PKGCONFIG OFF CACHE BOOL "" FORCE)
+
+if(NOT OpenMP_CXX_FOUND)
+  message(STATUS "OpenMP not found; building Eigen without it")
+  # Optional: keep Eigen single-threaded to avoid surprise
+  set(EIGEN_DONT_PARALLELIZE 1)
+endif()
 
 # Avoid adding Eigen's blas directory (explicitly ignore it)
 set(EIGEN_DISABLE_BLAS ON CACHE BOOL "Disable Eigen's BLAS build" FORCE)
@@ -115,68 +158,30 @@ string(REGEX REPLACE
 file(WRITE "${EIGEN_MATHFUNCTIONS_FILE}" "${MATHFUNCS_CONTENT_PATCHED}")
 ### End patch
 
-###############################################################################
-# RUN CODESYNTHESIS
-###############################################################################
-
-if(XML_SUPPORT)
-  add_definitions(-DXSD_CXX11)
-  if(MINGW OR WIN32)
-    set(xdr_flags)
-  else()
-    set(xdr_flags --generate-insertion XDR --generate-extraction XDR --std c++11)
-  endif()
-
-  # Generate percolator_in
-  set(xsdfiles_in ${CMAKE_CURRENT_BINARY_DIR}/percolator_in.cxx ${CMAKE_CURRENT_BINARY_DIR}/percolator_in.hxx)
-  set(percolator_in xml/percolator_in.xsd)
-  add_custom_command(
-    OUTPUT ${xsdfiles_in}
-    COMMAND ${XSD_EXECUTABLE} cxx-tree --generate-serialization ${xdr_flags} --root-element-all
-            --namespace-map ${percolator-in-namespace}=percolatorInNs
-            ${CMAKE_CURRENT_SOURCE_DIR}/${percolator_in}
-    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/${percolator_in}
-    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-    COMMENT "Generating percolator_in.* from XSD"
+if (MSVC)
+  add_compile_definitions(
+    _HAS_STD_BYTE=0     # disables std::byte so 'byte' in Windows headers is unambiguous
+    NOMINMAX            # avoid macro min/max conflicts
+    _WIN32_WINNT=0x0601 # silence that SDK warning (Windows 7 or higher)
   )
-
-  # Generate percolator_out
-  set(xsdfiles_out ${CMAKE_CURRENT_BINARY_DIR}/percolator_out.cxx ${CMAKE_CURRENT_BINARY_DIR}/percolator_out.hxx)
-  set(percolator_out xml/percolator_out.xsd)
-  add_custom_command(
-    OUTPUT ${xsdfiles_out}
-    COMMAND ${XSD_EXECUTABLE} cxx-tree --generate-serialization ${xdr_flags} --root-element-all
-            --namespace-map ${percolator-out-namespace}=percolatorOutNs
-            ${CMAKE_CURRENT_SOURCE_DIR}/${percolator_out}
-    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/${percolator_out}
-    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-    COMMENT "Generating percolator_out.* from XSD"
-  )
-
-  # 👇 This is the critical part!
-  add_custom_target(generate_xsd ALL DEPENDS ${xsdfiles_in} ${xsdfiles_out})
 endif()
 
 #############################################################################
 # COMPILE PERCOLATOR
 ###############################################################################
 
-if(XML_SUPPORT)
-  add_library(perclibrary STATIC ${xsdfiles_in} ${xsdfiles_out} parser.cxx serializer.cxx BaseSpline.cpp MassHandler.cpp
-                  PSMDescription.cpp ResultHolder.cpp IsotonicPEP.cpp
-								  XMLInterface.cpp SetHandler.cpp StdvNormalizer.cpp svm.cpp Caller.cpp CompositionSorter.cpp CrossValidation.cpp Enzyme.cpp Globals.cpp NoNormalizer.cpp Normalizer.cpp
+add_library(perclibrary STATIC BaseSpline.cpp MassHandler.cpp ResultHolder.cpp PSMDescription.cpp MonotoneRegressor.cpp IsotonicPEP.cpp
+								  SetHandler.cpp StdvNormalizer.cpp svm.cpp Caller.cpp CompositionSorter.cpp CrossValidation.cpp Enzyme.cpp Globals.cpp NoNormalizer.cpp Normalizer.cpp
 								  SanityCheck.cpp UniNormalizer.cpp DataSet.cpp TabFileValidator.cpp FeatureNames.cpp LogisticRegression.cpp Numerical.cpp Option.cpp PosteriorEstimator.cpp
 								  ProteinProbEstimator.cpp ProteinFDRestimator.cpp ScoreHolder.cpp Scores.cpp PseudoRandom.cpp Set.cpp SqtSanityCheck.cpp ssl.cpp PackedVector.cpp
 								  PackedMatrix.cpp Logger.cpp MyException.cpp ProteinScoreHolder.cpp PickedProteinInterface.cpp FeatureMemoryPool.cpp Timer.cpp TmpDir.cpp ValidateTabFile.cpp Vector.cpp)
-  add_dependencies(perclibrary generate_xsd)
-else(XML_SUPPORT)
-  add_library(perclibrary STATIC BaseSpline.cpp MassHandler.cpp ResultHolder.cpp PSMDescription.cpp IsotonicPEP.cpp
-								  XMLInterface.cpp SetHandler.cpp StdvNormalizer.cpp svm.cpp Caller.cpp CompositionSorter.cpp CrossValidation.cpp Enzyme.cpp Globals.cpp NoNormalizer.cpp Normalizer.cpp
-								  SanityCheck.cpp UniNormalizer.cpp DataSet.cpp TabFileValidator.cpp FeatureNames.cpp LogisticRegression.cpp Numerical.cpp Option.cpp PosteriorEstimator.cpp
-								  ProteinProbEstimator.cpp ProteinFDRestimator.cpp ScoreHolder.cpp Scores.cpp PseudoRandom.cpp Set.cpp SqtSanityCheck.cpp ssl.cpp PackedVector.cpp
-								  PackedMatrix.cpp Logger.cpp MyException.cpp ProteinScoreHolder.cpp PickedProteinInterface.cpp FeatureMemoryPool.cpp Timer.cpp TmpDir.cpp ValidateTabFile.cpp Vector.cpp)
-endif(XML_SUPPORT)
 
+if(OpenMP_CXX_FOUND)
+  target_link_libraries(perclibrary PUBLIC ${COMMON_LIBRARIES} OpenMP::OpenMP_CXX)
+else()
+  target_link_libraries(perclibrary PUBLIC ${COMMON_LIBRARIES})
+  target_compile_definitions(perclibrary PUBLIC EIGEN_DONT_PARALLELIZE)
+endif()
 
 ###############################################################################
 # COMPILE INTERNAL LIBRARIES
@@ -200,13 +205,6 @@ if(CRUX)
 ELSE(CRUX)
   add_executable(percolator main.cpp)
 
-  if(APPLE)
-    set_property(TARGET percolator PROPERTY LINK_SEARCH_START_STATIC FALSE)
-    set_property(TARGET percolator PROPERTY LINK_SEARCH_END_STATIC TRUE)
-  elseif(MINGW)
-    set_target_properties(percolator PROPERTIES LINK_FLAGS "-Wl,-Bdynamic -static-libgcc")
-  endif()
-
   if(PROFILING AND UNIX)
     set_target_properties(percolator PROPERTIES COMPILE_FLAGS -pg LINK_FLAGS -pg)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 ${PROFILING_COMMON_FLAGS}")
@@ -218,18 +216,17 @@ ELSE(CRUX)
   endif()
 
   # SET LIBRARIES FOR PERCOLATOR
-  set(COMMON_LIBRARIES perclibrary ${DBLAS_LIBRARIES} picked_protein ${XERCESC_LIBRARIES} ${CMAKE_THREAD_LIBS_INIT} ${CURL_LIBRARIES} ${RPC_LIBRARIES})
+  list(APPEND COMMON_LIBRARIES perclibrary ${DBLAS_LIBRARIES} picked_protein ${CURL_LIBRARIES} ${RPC_LIBRARIES})
   if(NOT MSVC)
-    if(APPLE)
-      set(COMMON_LIBRARIES ${COMMON_LIBRARIES} ${OpenMP_CXX_LIBRARIES})
-    else(APPLE)
-      set(COMMON_LIBRARIES ${COMMON_LIBRARIES} stdc++)
-    endif(APPLE)
+    if(NOT APPLE)
+      list(APPEND COMMON_LIBRARIES stdc++)
+    endif(NOT APPLE)
   endif(NOT MSVC)
+
   if(COVERAGE)
-    target_link_libraries(percolator -fprofile-arcs ${COMMON_LIBRARIES} ${Boost_LIBRARIES})
+    target_link_libraries(percolator PRIVATE -fprofile-arcs ${COMMON_LIBRARIES})
   else(COVERAGE)
-    target_link_libraries(percolator ${COMMON_LIBRARIES} ${Boost_LIBRARIES})
+    target_link_libraries(percolator PRIVATE ${COMMON_LIBRARIES})
   endif(COVERAGE)
 
   # INSTALL PERCOLATOR

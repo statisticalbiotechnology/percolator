@@ -80,7 +80,9 @@ limitations under the License.
 #endif
 
 #ifdef _MSC_VER
-  #define NOMINMAX
+  #ifndef NOMINMAX
+    #define NOMINMAX
+  #endif  #define NOMINMAX
   #include <float.h>
   #define _finite(x) _finite(x)
 #endif
@@ -151,7 +153,6 @@ class Globals {
     void initLogger();
     int redirectBuffer();
     void unredirectBuffer();
-    const std::string getXMLDir(bool isConverter = false);    
   private:
     Globals();
     int verbose;

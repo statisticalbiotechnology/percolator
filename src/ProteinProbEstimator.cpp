@@ -432,50 +432,6 @@ bool ProteinProbEstimator::isTarget(const std::string& proteinName) {
 }
 
 
-void ProteinProbEstimator::writeOutputToXML(string xmlOutputFN, bool outputDecoys) {
-  ofstream os;
-  os.open(xmlOutputFN.data(), ios::app);
-  // append PROTEINs tag
-  os << "  <proteins>" << endl;
-  for (std::vector<ProteinScoreHolder>::const_iterator myP = proteins_.begin(); 
-	      myP != proteins_.end(); myP++) {
-    if ( (!outputDecoys && myP->isTarget()) || (outputDecoys)) {
-      os << "    <protein p:protein_id=\"" << myP->getName() << "\"";
-	    if (outputDecoys) {
-	      if (myP->isDecoy()) 
-	        os << " p:decoy=\"true\"";
-	      else  
-	        os << " p:decoy=\"false\"";
-	    }
-	    os << ">" << endl;
-	    
-	    os << "      <pep>" << scientific << myP->getPEP() << "</pep>" << endl;
-	  
-	    if (outputEmpirQVal_) {
-	      os << "      <q_value_emp>" << scientific << myP->getQemp() << "</q_value_emp>\n";
-	    }
-	  
-	    os << "      <q_value>" << scientific << myP->getQ() << "</q_value>\n";
-	    
-	    if (outputEmpirQVal_) {
-	      os << "      <p_value>" << scientific << myP->getP() << "</p_value>\n";
-	    }
-	  
-	    const std::vector<ProteinScoreHolder::Peptide> peptides = myP->getPeptidesByRef();
-	    for (std::vector<ProteinScoreHolder::Peptide>::const_iterator peptIt = peptides.begin(); 
-	        peptIt != peptides.end(); peptIt++) {
-	      if (peptIt->name != "") {
-	        os << "      <peptide_seq seq=\"" << peptIt->name << "\"/>"<<endl;
-	      }
-	    }
-	    os << "    </protein>" << endl;
-	  }
-  }
-    
-  os << "  </proteins>" << endl << endl;
-  os.close();
-}
-
 void ProteinProbEstimator::print(ostream& myout, bool decoy) {  
   myout << "ProteinId\tProteinGroupId\tq-value\tposterior_error_prob\t";
   if (specCountQvalThreshold_ > 0.0) {

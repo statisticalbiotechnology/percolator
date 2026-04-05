@@ -37,53 +37,17 @@ sudo yum install -y mingw32-boost-static mingw32-sqlite mingw32-zlib mingw32-cur
 
 cd ${src_dir}
 
-# download and patch xsd
-
-xsd=xsd-3.3.0-x86_64-linux-gnu
-wget --quiet http://www.codesynthesis.com/download/xsd/3.3/linux-gnu/x86_64/${xsd}.tar.bz2
-tar xjf ${xsd}.tar.bz2
-sed -i 's/setg/this->setg/g' ${xsd}/libxsd/xsd/cxx/zc-istream.txx
-sed -i 's/ push_back/ this->push_back/g' ${xsd}/libxsd/xsd/cxx/tree/parsing.txx
-sed -i 's/ push_back/ this->push_back/g' ${xsd}/libxsd/xsd/cxx/tree/stream-extraction.hxx
-
-# download, compile and link xerces
-xer=xerces-c-3.1.2
-
-wget --quiet http://apache.mirrors.spacedump.net//xerces/c/3/sources/${xer}.tar.gz
-
 mkdir -p ${build_dir}
 cd ${build_dir}
 
-tar xzf ${src_dir}/${xer}.tar.gz 
-cd ${xer}/
-./configure --disable-network --disable-threads --enable-transcoder-windows --disable-static --enable-shared --host=i686-w64-mingw32 --prefix=/usr/i686-w64-mingw32/sys-root/mingw
-cd src/
-make libxerces_c_la_LDFLAGS="-release 3.1 -no-undefined" -j4
-sudo make install
-
 # download, compile and link percolator
-
-mkdir -p ${build_dir}/percolator-noxml
-cd ${build_dir}/percolator-noxml
-
-mingw32-cmake -DCMAKE_PREFIX_PATH="${src_dir}/${xsd}/;${src_dir}/${xer}/src/" -DXML_SUPPORT=OFF -DCMAKE_BUILD_TYPE=Release ${src_dir}/percolator
-make -j4 package
-
-cp -v per*.exe ${release_dir}
 
 mkdir -p ${build_dir}/percolator
 cd ${build_dir}/percolator
 
-mingw32-cmake -DCMAKE_PREFIX_PATH="${src_dir}/${xsd}/;${src_dir}/${xer}/src/" -DXML_SUPPORT=ON -DCMAKE_BUILD_TYPE=Release ${src_dir}/percolator
+mingw32-cmake -DCMAKE_BUILD_TYPE=Release ${src_dir}/percolator
 make -j4 package
 
-cp -v per*.exe ${release_dir}
- 
-mkdir -p ${build_dir}/converters
-cd ${build_dir}/converters
-
-mingw32-cmake -DSERIALIZE="Boost" -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH="${src_dir}/${xsd}/" ${src_dir}/percolator/src/converters
-make -j4 package
 cp -v per*.exe ${release_dir}
 
 echo "build directory is : ${build_dir}";
