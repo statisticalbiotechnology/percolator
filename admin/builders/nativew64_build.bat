@@ -78,7 +78,7 @@ if not exist "%BOOST_ROOT%" (
       if exist bootstrap.log type bootstrap.log
       exit /b 1
   )
-  b2 address-model=64 threading=multi -j4 --with-system --with-filesystem --with-serialization -d0
+  b2 toolset=msvc address-model=64 threading=multi -j4 --with-system --with-filesystem --with-serialization -d0
   if errorlevel 1 (
       echo ERROR: b2 build failed.
       exit /b 1
