@@ -211,7 +211,7 @@ void Scores::createXvalSetsBySpectrum(std::vector<Scores>& train,
   train.resize(xval_fold, Scores(usePi0_));
   test.resize(xval_fold, Scores(usePi0_));
   size_t approxTestSize = scores_.size() / xval_fold + 1;
-  size_t approxTrainSize = scores_.size() - approxTestSize;
+  size_t approxTrainSize = (approxTestSize < scores_.size()) ? scores_.size() - approxTestSize : scores_.size();
   for (unsigned int i = 0; i < xval_fold; ++i) {
     train[i].reserve(approxTrainSize);
     test[i].reserve(approxTestSize);
