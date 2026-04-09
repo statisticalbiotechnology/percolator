@@ -6,7 +6,7 @@ jobs:
   build-ubuntu:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     - name: preinstall
       run: sudo apt-get update 
     - name: create_dirs
@@ -22,7 +22,7 @@ jobs:
 #    runs-on: ubuntu-latest
 #    container: 'lukall/centos_runner:latest'
 #    steps:
-#    - uses: actions/checkout@v4
+#    - uses: actions/checkout@v6
 #    - name: create_dirs
 #      run: mkdir -p ../my_rel ../my_build
 #    - name: configure_and_make
@@ -36,7 +36,7 @@ jobs:
   build-osx:
     runs-on: macos-15
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     - name: create_dirs
       run: mkdir -p ${{ github.workspace }}/release ${{ github.workspace }}/build
     - name: configure_and_make
@@ -52,7 +52,7 @@ jobs:
       run:
         shell: cmd
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     - name: create_dirs
       run: mkdir "%GITHUB_WORKSPACE%\rel" "%GITHUB_WORKSPACE%\build"
     - name: configure_and_make

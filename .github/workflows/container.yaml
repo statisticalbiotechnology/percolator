@@ -13,7 +13,7 @@ jobs:
             percolator_cmake_args: "-DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr -DGOOGLE_TEST=0 -DNO_TESTS=ON"
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
       - name: Run docker/setup-qemu-action
         uses: docker/setup-qemu-action@v3
       - name: Run docker/setup-buildx-action
