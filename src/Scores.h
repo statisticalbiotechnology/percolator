@@ -128,6 +128,7 @@ class Scores {
   inline unsigned int negSize() const { return totalNumberOfDecoys_; }
 
   inline void addScoreHolder(const ScoreHolder& sh) { scores_.push_back(sh); }
+  inline void reserve(size_t n) { scores_.reserve(n); }
 
   inline void setNullTargetWinProb(const double nullTargetWinProb) {
     nullTargetWinProb_ = nullTargetWinProb;

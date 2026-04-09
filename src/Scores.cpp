@@ -210,6 +210,12 @@ void Scores::createXvalSetsBySpectrum(std::vector<Scores>& train,
   // set the number of cross validation folds for train and test to xval_fold
   train.resize(xval_fold, Scores(usePi0_));
   test.resize(xval_fold, Scores(usePi0_));
+  size_t approxTestSize = scores_.size() / xval_fold + 1;
+  size_t approxTrainSize = scores_.size() - approxTestSize;
+  for (unsigned int i = 0; i < xval_fold; ++i) {
+    train[i].reserve(approxTrainSize);
+    test[i].reserve(approxTestSize);
+  }
   // remain keeps track of residual space available in each fold
   std::vector<int> remain(xval_fold);
   // set values for remain: initially each fold is assigned (tot number of
@@ -565,19 +571,19 @@ void Scores::weedOutRedundant(
   LabelType previousLabel = LabelType::UNDEFINED;
   size_t lastWrittenIdx = 0u;
   for (size_t idx = 0u; idx < scores_.size(); ++idx) {
-    std::string currentPeptide = scores_.at(idx).pPSM->getPeptideSequence();
-    LabelType currentLabel = scores_.at(idx).label;
+    std::string currentPeptide = scores_[idx].pPSM->getPeptideSequence();
+    LabelType currentLabel = scores_[idx].label;
     if (currentPeptide != previousPeptide || currentLabel != previousLabel) {
       // insert as a new score
-      scores_.at(lastWrittenIdx++) = scores_.at(idx);
+      scores_[lastWrittenIdx++] = scores_[idx];
       previousPeptide = currentPeptide;
       previousLabel = currentLabel;
     }
     // append the psm
-    peptidePsmMap_[scores_.at(lastWrittenIdx - 1).pPSM].push_back(
-        scores_.at(idx).pPSM);
+    peptidePsmMap_[scores_[lastWrittenIdx - 1].pPSM].push_back(
+        scores_[idx].pPSM);
     if (specCountQvalThreshold > 0.0 &&
-        scores_.at(idx).q < specCountQvalThreshold) {
+        scores_[idx].q < specCountQvalThreshold) {
       ++peptideSpecCounts[currentPeptide];
     }
   }
