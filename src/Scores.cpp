@@ -463,8 +463,8 @@ int Scores::calcScores(std::vector<double>& w) {
 }
 
 void Scores::getScoreLabelPairs(std::vector<pair<double, bool> >& combined) {
-  combined.clear();
-  transform(scores_.begin(), scores_.end(), back_inserter(combined),
+  combined.resize(scores_.size());
+  transform(scores_.begin(), scores_.end(), combined.begin(),
             mem_fn(&ScoreHolder::toPair));
 }
 
@@ -475,9 +475,14 @@ void Scores::getScoreLabelPairs(std::vector<pair<double, bool> >& combined) {
  * @return number of true positives
  */
 int Scores::calcQvals(double fdr, bool skipDecoysPlusOne) {
+  std::vector<pair<double, bool> > combined;
+  return calcQvals(fdr, skipDecoysPlusOne, combined);
+}
+
+int Scores::calcQvals(double fdr, bool skipDecoysPlusOne,
+                      std::vector<pair<double, bool> >& combined) {
   assert(totalNumberOfDecoys_ + totalNumberOfTargets_ == size());
 
-  std::vector<pair<double, bool> > combined;
   getScoreLabelPairs(combined);
 
   std::vector<double> qvals;
@@ -646,6 +651,10 @@ int Scores::getInitDirection(const double initialSelectionFdr,
   // is too restrictive for small datasets
   bool skipDecoysPlusOne = true;
 
+  // pre-allocate once and reuse across all 2*numFeatures calcQvals calls
+  std::vector<pair<double, bool> > combined;
+  combined.reserve(scores_.size());
+
   for (unsigned int featNo = 0; featNo < FeatureNames::getNumFeatures();
        featNo++) {
     for (std::vector<ScoreHolder>::iterator scoreIt = scores_.begin();
@@ -659,7 +668,7 @@ int Scores::getInitDirection(const double initialSelectionFdr,
       if (i == 1) {
         reverse(scores_.begin(), scores_.end());
       }
-      int positives = calcQvals(initialSelectionFdr, skipDecoysPlusOne);
+      int positives = calcQvals(initialSelectionFdr, skipDecoysPlusOne, combined);
       if (positives > bestPositives) {
         bestPositives = positives;
         bestFeature = static_cast<int>(featNo);

@@ -164,6 +164,8 @@ class Scores {
       boost::unordered_map<double*, double*>& movedAddresses,
       size_t& idx);
   void getScoreLabelPairs(std::vector<std::pair<double, bool> >& combined);
+  int calcQvals(double fdr, bool skipDecoysPlusOne,
+                std::vector<std::pair<double, bool> >& combined);
   void checkSeparationAndSetPi0();
   bool is_output_rt_ = false;
 };
