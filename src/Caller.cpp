@@ -151,32 +151,32 @@ bool Caller::parseOptions(int argc, char** argv) {
   // available lower case letters:
   // available upper case letters:
   cmd.defineOption("Q", "pepxml-output",
-                   "Write a rudimentary pepXML file with psm-level statistics "
-                   "to the specified filename.",
+                   "Write a rudimentary pepXML file with PSM-level statistics "
+                   "to the specified file.",
                    "filename");
   cmd.defineOption(
       "", "stdinput-tab",
-      "Read percolator tab-input format (pin-tab) from standard input", "",
+      "Read tab-delimited PIN format from standard input.", "",
       TRUE_IF_SET);
   cmd.defineOption("p", "Cpos",
-                   "Cpos, penalty for mistakes made on positive examples. Set "
-                   "by cross validation if not specified.",
+                   "SVM cost for positive examples. Determined by "
+                   "cross-validation if not specified.",
                    "value");
   cmd.defineOption(
       "n", "Cneg",
-      "Cneg, penalty for mistakes made on negative examples. Set by cross "
-      "validation if not specified or if -p is not specified.",
+      "SVM cost for negative examples. Determined by cross-validation if not "
+      "specified, or if -p is not specified.",
       "value");
   cmd.defineOption("t", "testFDR",
-                   "False discovery rate threshold for evaluating best cross "
-                   "validation result and reported end result. Default = 0.01.",
+                   "FDR threshold for selecting the best cross-validation "
+                   "result and for the final reported results. Default = 0.01.",
                    "value");
   cmd.defineOption("F", "trainFDR",
-                   "False discovery rate threshold to define positive examples "
-                   "in training. Set to testFDR if 0. Default = 0.01.",
+                   "FDR threshold for defining positive training examples. "
+                   "Defaults to --testFDR when set to 0. Default = 0.01.",
                    "value");
   cmd.defineOption("i", "maxiter",
-                   "Maximal number of iterations. Default = 10.", "number");
+                   "Maximum number of iterations. Default = 10.", "number");
   cmd.defineOption(
       "N", "subset-max-train",
       "Only train an SVM on a subset of <x> PSMs, and use the resulting score "
@@ -188,18 +188,19 @@ bool Caller::parseOptions(int argc, char** argv) {
                    "Quicker execution by reduced internal cross-validation.",
                    "", TRUE_IF_SET);
   cmd.defineOption("J", "tab-out",
-                   "Output computed features to given file in pin-tab format.",
+                   "Output computed features to the specified file in "
+                   "tab-delimited PIN format.",
                    "filename");
   cmd.defineOption(
       "j", "tab-in",
-      "[set by default] Input file given in pin-tab format. This is the "
-      "default setting, flag only present for backwards compatibility.",
+      "Input file in tab-delimited PIN format. Tab-delimited input is the "
+      "default; this flag exists for backwards compatibility.",
       "filename");
   cmd.defineOption("K", "protein-name-separator",
                    "The separator used in tab delimited input and output for "
                    "separating protein names. Default = tab-char.",
                    "char");
-  cmd.defineOption("w", "weights", "Output final weights to the given file",
+  cmd.defineOption("w", "weights", "Output final SVM weights to the given file.",
                    "filename");
   cmd.defineOption(
       "W", "init-weights",
@@ -218,7 +219,7 @@ bool Caller::parseOptions(int argc, char** argv) {
                    "[-]?featureName");
   cmd.defineOption(
       "v", "verbose",
-      "Set verbosity of output: 0=no processing info, 5=all. Default = 2",
+      "Set verbosity of output: 0=no processing info, 5=all. Default = 2.",
       "level");
   cmd.defineOption("o", "no-terminate",
                    "Do not stop execution when encountering questionable SVM "
@@ -226,38 +227,36 @@ bool Caller::parseOptions(int argc, char** argv) {
                    "", TRUE_IF_SET);
   cmd.defineOption("u", "unitnorm",
                    "Use unit normalization [0-1] instead of standard deviation "
-                   "normalization",
+                   "normalization.",
                    "", TRUE_IF_SET);
   cmd.defineOption("R", "test-each-iteration",
-                   "Measure performance on test set each iteration", "",
+                   "Measure performance on the test set after each iteration.", "",
                    TRUE_IF_SET);
   cmd.defineOption("O", "override",
                    "Override error check and do not fall back on default score "
                    "vector in case of suspect score vector from SVM.",
                    "", TRUE_IF_SET);
   cmd.defineOption("S", "seed",
-                   "Set seed of the random number generator. Default = 1",
+                   "Set seed of the random number generator. Default = 1.",
                    "value");
   cmd.defineOption("r", "results-peptides",
-                   "Output tab delimited results of peptides to a file instead "
-                   "of stdout (will be ignored if used with -U option)",
+                   "Output tab-delimited results of peptides to a file instead "
+                   "of stdout (ignored if used with -U).",
                    "filename");
   cmd.defineOption("B", "decoy-results-peptides",
-                   "Output tab delimited results for decoy peptides into a "
-                   "file (will be ignored if used with -U option)",
+                   "Output tab-delimited results for decoy peptides to a file "
+                   "(ignored if used with -U).",
                    "filename");
   cmd.defineOption(
       "m", "results-psms",
-      "Output tab delimited results of PSMs to a file instead of stdout",
+      "Output tab-delimited results of PSMs to a file instead of stdout.",
       "filename");
   cmd.defineOption("M", "decoy-results-psms",
-                   "Output tab delimited results for decoy PSMs into a file",
+                   "Output tab-delimited results for decoy PSMs to a file.",
                    "filename");
   cmd.defineOption("U", "only-psms",
-                   "Report results only at the PSM level. This flag causes "
-                   "Percolator to skip the step that selects the top-scoring "
-                   "PSM per peptide; hence, peptide-level results are left out "
-                   "and only PSM-level results are reported.",
+                   "Report only PSM-level results, skipping peptide-level "
+                   "aggregation.",
                    "", FALSE_IF_SET);
   cmd.defineOption(
       "y", "post-processing-mix-max",
@@ -293,12 +292,12 @@ bool Caller::parseOptions(int argc, char** argv) {
       "to skip protein grouping.",
       "value");
   cmd.defineOption("l", "results-proteins",
-                   "Output tab delimited results of proteins to a file instead "
-                   "of stdout (Only valid if option -A or -f is active)",
+                   "Output tab-delimited results of proteins to a file instead "
+                   "of stdout (only valid with -f).",
                    "filename");
   cmd.defineOption("L", "decoy-results-proteins",
-                   "Output tab delimited results for decoy proteins into a "
-                   "file (Only valid if option -A or -f is active)",
+                   "Output tab-delimited results for decoy proteins to a file "
+                   "(only valid with -f).",
                    "filename");
   cmd.defineOption(
       "P", "protein-decoy-pattern",
@@ -339,7 +338,7 @@ bool Caller::parseOptions(int argc, char** argv) {
       "inside protein IDs will be replaced by semicolons. Not available for "
       "Fido.",
       "", TRUE_IF_SET);
-  cmd.defineOption("", "no-analytics", "Swich off analytics reporting", "",
+  cmd.defineOption("", "no-analytics", "Switch off analytics reporting.", "",
                    TRUE_IF_SET);
   /* EXPERIMENTAL FLAGS: no long term support, flag names might be subject to
    * change and behavior */
@@ -354,8 +353,8 @@ bool Caller::parseOptions(int argc, char** argv) {
                    "value");
   cmd.defineOption(
       Option::EXPERIMENTAL_FEATURE, "spectral-counting-fdr",
-      "Activates spectral counting on protein level (--picked-protein has to "
-      "be set) at the specified PSM q-value threshold. Adds two columns, "
+      "Activate spectral counting at the protein level (requires "
+      "--picked-protein) at the specified PSM q-value threshold. Adds two columns, "
       "\"spec_count_unique\" and \"spec_count_all\", to the protein tab "
       "separated output, containing the spectral count for the peptides unique "
       "to the protein and the spectral count including shared peptides "
@@ -387,7 +386,7 @@ bool Caller::parseOptions(int argc, char** argv) {
       "target-decoy matching based on composition.",
       "", TRUE_IF_SET);
   cmd.defineOption("RT", "output-retention-time",
-                   "Adds retention time column to the output file", "",
+                   "Add a retention time column to the output file.", "",
                    TRUE_IF_SET);
   cmd.defineOption("",
       "irls-pep",

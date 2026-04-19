@@ -627,11 +627,11 @@ bool PosteriorEstimator::parseOptions(int argc, char** argv) {
   // finally parse and handle return codes (display help etc...)
   cmd.defineOption("v",
                    "verbose",
-                   "Set verbosity of output: 0=no processing info, 5=all, default is 2",
+                   "Set verbosity of output: 0=no processing info, 5=all. Default = 2.",
                    "level");
   cmd.defineOption("s",
                    "epsilon-step",
-                   "The relative step size used as treshhold before cross validation error is calculated",
+                   "Relative step size threshold before cross-validation error is calculated.",
                    "value");
   cmd.defineOption("n",
                    "number-of-bins",
@@ -639,11 +639,11 @@ bool PosteriorEstimator::parseOptions(int argc, char** argv) {
                    "bins");
   cmd.defineOption("c",
                    "epsilon-cross-validation",
-                   "The relative crossvalidation step size used as treshhold before ending the iterations",
+                   "Relative cross-validation step size threshold for ending iterations.",
                    "value");
   cmd.defineOption("r",
                    "reverse",
-                   "Indicating that the scoring mechanism is reversed, i.e., that low scores are better than higher scores",
+                   "Indicate that lower scores are better (reversed scoring).",
                    "",
                    TRUE_IF_SET);
   cmd.defineOption("o",
@@ -652,12 +652,12 @@ bool PosteriorEstimator::parseOptions(int argc, char** argv) {
                    "file");
   cmd.defineOption("Y",
                    "tdc-input",
-                   "Turns off the pi0 correction for search results from a concatenated database.",
+                   "Turn off the pi0 correction for results from a concatenated target-decoy database.",
                    "",
                    TRUE_IF_SET);
   cmd.defineOption("d",
                    "include-negative",
-                   "Include negative hits (decoy) probabilities in the results",
+                   "Include decoy probabilities in the output.",
 		    "",
 		    TRUE_IF_SET);
 
