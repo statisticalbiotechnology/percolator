@@ -1,0 +1,241 @@
+#!/usr/bin/env python3
+"""
+Generate the interface documentation page for percolator.github.com
+from the C++ source code option definitions.
+
+Usage:
+    python3 doc/generate_interface_doc.py > output.textile
+
+The output is a Jekyll Textile file ready to replace
+_posts/2010-10-27-interface.textile in the percolator.github.com repo.
+"""
+
+import re
+import sys
+from pathlib import Path
+
+REPO_ROOT = Path(__file__).parent.parent
+
+SOURCE_FILES = {
+    "percolator": REPO_ROOT / "src" / "Caller.cpp",
+    "qvality": REPO_ROOT / "src" / "PosteriorEstimator.cpp",
+    "picked-protein": REPO_ROOT / "src" / "picked_protein" / "PickedProteinCaller.cpp",
+}
+
+
+def join_cpp_strings(text):
+    """Collapse adjacent C++ string literals: "foo"\n"bar" -> "foobar" """
+    return re.sub(r'"\s*\n\s*"', "", text)
+
+
+def extract_cpp_string(text):
+    text = join_cpp_strings(text.strip())
+    parts = re.findall(r'"((?:[^"\\]|\\.)*)"', text)
+    return "".join(parts)
+
+
+def parse_cpp_args(text):
+    """Split a C++ argument list by top-level commas, respecting strings."""
+    args = []
+    depth = 0
+    in_string = False
+    escape = False
+    current = ""
+
+    for ch in text:
+        if escape:
+            current += ch
+            escape = False
+            continue
+        if ch == "\\" and in_string:
+            current += ch
+            escape = True
+            continue
+        if ch == '"':
+            in_string = not in_string
+            current += ch
+            continue
+        if in_string:
+            current += ch
+            continue
+        if ch in "({[":
+            depth += 1
+            current += ch
+        elif ch in ")}]":
+            depth -= 1
+            current += ch
+        elif ch == "," and depth == 0:
+            args.append(current.strip())
+            current = ""
+        else:
+            current += ch
+
+    if current.strip():
+        args.append(current.strip())
+    return args
+
+
+def parse_options(source_file):
+    """Return a list of option dicts parsed from defineOption calls."""
+    content = source_file.read_text()
+    content = re.sub(r"//[^\n]*", "", content)  # strip line comments
+
+    pattern = r"cmd\.defineOption\s*\((.*?)\)\s*;"
+    matches = re.findall(pattern, content, re.DOTALL)
+
+    options = []
+    for match in matches:
+        args = parse_cpp_args(match)
+        if len(args) < 3:
+            continue
+
+        short_raw = args[0].strip()
+        long_opt = extract_cpp_string(args[1])
+        help_text = extract_cpp_string(args[2])
+        help_type = extract_cpp_string(args[3]) if len(args) > 3 else ""
+        default = extract_cpp_string(args[5]) if len(args) > 5 else ""
+
+        if "NO_SHORT_OPT" in short_raw:
+            short_opt = None
+            experimental = False
+        elif "EXPERIMENTAL_FEATURE" in short_raw:
+            short_opt = None
+            experimental = True
+        else:
+            short_opt = extract_cpp_string(short_raw) or None
+            experimental = False
+
+        if long_opt in ("help", ""):
+            continue
+
+        options.append(
+            {
+                "short": short_opt,
+                "long": long_opt,
+                "help": help_text,
+                "type": help_type,
+                "default": default,
+                "experimental": experimental,
+            }
+        )
+
+    return options
+
+
+def h(s):
+    return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+
+def options_table(options):
+    rows = ["<table>", "  <thead>",
+            "    <tr><th>Option</th><th>Description</th></tr>",
+            "  </thead>", "  <tbody>"]
+    for opt in options:
+        flags = []
+        if opt["short"]:
+            f = f"<code>-{opt['short']}"
+            if opt["type"]:
+                f += f" &lt;{h(opt['type'])}&gt;"
+            f += "</code>"
+            flags.append(f)
+        f = f"<code>--{opt['long']}"
+        if opt["type"]:
+            f += f" &lt;{h(opt['type'])}&gt;"
+        f += "</code>"
+        flags.append(f)
+
+        flag_cell = ", ".join(flags)
+        if opt["experimental"]:
+            flag_cell = "<em>[experimental]</em><br/>" + flag_cell
+
+        desc = h(opt["help"])
+        if opt["default"]:
+            desc += f" <em>(default: {h(opt['default'])})</em>"
+
+        rows.append(f"    <tr><td>{flag_cell}</td><td>{desc}</td></tr>")
+    rows += ["  </tbody>", "</table>"]
+    return "\n".join(rows)
+
+
+HEADER = """\
+---
+layout: default
+title: Interface
+categories: all
+---
+"""
+
+INTRO = """\
+h2. Input format (PIN)
+
+Percolator accepts a tab-delimited input file (PIN format) where each row
+describes one peptide-spectrum match (PSM):
+
+<pre><code>id \\t label \\t scannr \\t feature1 \\t ... \\t featureN \\t peptide \\t proteinId1 \\t ... \\t proteinIdM
+</code></pre>
+
+* @label@ is @1@ for target PSMs and @-1@ for decoys.
+* Features are numerical values used by the SVM.
+* The @peptide@ column uses the format @X.PEPTIDE.X@ where X is the flanking amino acid.
+
+PIN files are typically generated by converters such as
+"crux":https://crux.ms, "ms2rescore":https://ms2rescore.readthedocs.io, or
+"oktoberfest":https://oktoberfest.readthedocs.io.
+
+"""
+
+PERCOLATOR_USAGE = """\
+h2. percolator
+
+<pre><code>percolator [options] pin.tsv
+</code></pre>
+
+"""
+
+QVALITY_USAGE = """\
+h2. qvality
+
+Qvality estimates posterior error probabilities (PEP) and q-values from a
+set of target and decoy scores.
+
+<pre><code>qvality [options] target_scores.txt decoy_scores.txt
+</code></pre>
+
+Alternatively, accurate p-values can be provided in a single file.
+
+"""
+
+PICKED_PROTEIN_USAGE = """\
+h2. picked-protein
+
+Picked-protein infers protein-level FDR from Percolator peptide output.
+
+<pre><code>picked-protein -i percolator_peptides.tsv -d database.fasta -o proteins.tsv
+</code></pre>
+
+"""
+
+
+def main():
+    out = [HEADER, INTRO]
+
+    out.append(PERCOLATOR_USAGE)
+    perc_opts = parse_options(SOURCE_FILES["percolator"])
+    out.append(options_table(perc_opts))
+    out.append("\n\n")
+
+    out.append(QVALITY_USAGE)
+    qval_opts = parse_options(SOURCE_FILES["qvality"])
+    out.append(options_table(qval_opts))
+    out.append("\n\n")
+
+    out.append(PICKED_PROTEIN_USAGE)
+    pp_opts = parse_options(SOURCE_FILES["picked-protein"])
+    out.append(options_table(pp_opts))
+    out.append("\n")
+
+    print("".join(out), end="")
+
+
+if __name__ == "__main__":
+    main()
