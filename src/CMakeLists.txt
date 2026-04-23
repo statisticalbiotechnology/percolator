@@ -51,17 +51,14 @@ endif()
 
 
 # --- Boost configuration (platform-aware) ---
-# We mostly want static, but Homebrew on macOS ships only dynamic libs.
-if(APPLE)
-  set(Boost_USE_STATIC_LIBS OFF)
-  set(Boost_USE_MULTITHREADED ON)
-elseif(MSVC)
+# Windows needs static Boost to match the CRT. Linux and macOS use shared libs
+# (macOS Homebrew ships shared-only; Linux distros vary but shared is always present).
+if(MSVC)
   set(Boost_USE_STATIC_LIBS ON)
-  set(Boost_USE_MULTITHREADED ON)
 else()
-  set(Boost_USE_STATIC_LIBS ON)
-  set(Boost_USE_MULTITHREADED ON)
+  set(Boost_USE_STATIC_LIBS OFF)
 endif()
+set(Boost_USE_MULTITHREADED ON)
 
 # Prefer Boost's classic FindBoost over boost-cmake configs
 set(Boost_NO_BOOST_CMAKE ON CACHE BOOL "" FORCE)
