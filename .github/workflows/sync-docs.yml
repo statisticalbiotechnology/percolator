@@ -1,0 +1,47 @@
+name: Sync interface documentation
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - src/Caller.cpp
+      - src/PosteriorEstimator.cpp
+      - src/picked_protein/PickedProteinCaller.cpp
+      - doc/generate_interface_doc.py
+  workflow_dispatch:
+
+jobs:
+  sync-docs:
+    runs-on: ubuntu-latest
+    if: github.repository == 'percolator/percolator'
+    steps:
+      - name: Checkout percolator
+        uses: actions/checkout@v4
+
+      - name: Generate interface documentation
+        run: python3 doc/generate_interface_doc.py > /tmp/interface.textile
+
+      - name: Checkout docs repo
+        uses: actions/checkout@v4
+        with:
+          repository: percolator/percolator.github.com
+          path: percolator.github.com
+          token: ${{ secrets.DOCS_REPO_TOKEN }}
+
+      - name: Copy generated page
+        run: cp /tmp/interface.textile percolator.github.com/_posts/2010-10-27-interface.textile
+
+      - name: Create pull request
+        uses: peter-evans/create-pull-request@v7
+        with:
+          token: ${{ secrets.DOCS_REPO_TOKEN }}
+          path: percolator.github.com
+          commit-message: "Update interface docs from percolator source"
+          branch: auto/update-interface-docs
+          delete-branch: true
+          title: "Update interface documentation"
+          body: |
+            Auto-generated from changes to the percolator source code.
+
+            Triggered by commit ${{ github.sha }} on the main percolator repository.
+          labels: documentation

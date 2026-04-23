@@ -6,9 +6,9 @@ jobs:
   build-ubuntu:
     runs-on: ubuntu-latest
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     - name: preinstall
-      run: sudo apt-get update && sudo apt-get install -y -o Acquire::Retries=3 libxml2-utils
+      run: sudo apt-get update
     - name: create_dirs
       run: mkdir -p ${{ github.workspace }}/rel ${{ github.workspace }}/build
     - name: configure_and_make
@@ -16,7 +16,7 @@ jobs:
     - name: test
       run: cd ${{ github.workspace }}/build/percolator && sudo make install && make test ARGS="-V"
     - name: zip raw binary
-      run: zip -j ${{ github.workspace }}/rel/percolator-noxml-ubuntu-portable.zip ${{ github.workspace }}/build/percolator-noxml/src/percolator
+      run: zip -j ${{ github.workspace }}/rel/percolator-ubuntu-portable.zip ${{ github.workspace }}/build/percolator/src/percolator
     - name: Upload packages
       uses: actions/upload-artifact@v4
       with:
@@ -27,7 +27,7 @@ jobs:
     runs-on: ubuntu-latest
     container: 'lukall/centos_runner:latest'
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     - name: environment fixes
       run: |
         # CentOS7 EOL fix for mirrors: https://serverfault.com/questions/1161816/mirrorlist-centos-org-no-longer-resolve/1161847#1161847
@@ -48,7 +48,7 @@ jobs:
       run: |
         cd -P ${{ github.workspace }}/../build/percolator && make install && make test ARGS="-V"
     - name: zip raw binary
-      run: zip -j ${{ github.workspace }}/release/percolator-noxml-linux-portable.zip ${{ github.workspace }}/../build/percolator-noxml/src/percolator
+      run: zip -j ${{ github.workspace }}/release/percolator-linux-portable.zip ${{ github.workspace }}/../build/percolator/src/percolator
     - name: Upload packages
       uses: actions/upload-artifact@v3
       with:
@@ -58,7 +58,7 @@ jobs:
   build-osx:
     runs-on: macos-15
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     - name: create_dirs
       run: mkdir -p ${{ github.workspace }}/rel ${{ github.workspace }}/build
     - name: configure_and_make
@@ -66,7 +66,7 @@ jobs:
     - name: test
       run: cd ${{ github.workspace }}/build/percolator && sudo make install && make test ARGS="-V"
     - name: zip raw binary
-      run: zip ${{ github.workspace }}/rel/percolator-noxml-osx-portable.zip ${{ github.workspace }}/build/percolator-noxml/src/percolator
+      run: zip ${{ github.workspace }}/rel/percolator-osx-portable.zip ${{ github.workspace }}/build/percolator/src/percolator
     - name: Upload packages
       uses: actions/upload-artifact@v4
       with:
@@ -79,7 +79,7 @@ jobs:
       run:
         shell: cmd
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v6
     - name: create_dirs
       run: mkdir "%GITHUB_WORKSPACE%\rel" "%GITHUB_WORKSPACE%\build"
     - name: configure_and_make
@@ -90,9 +90,9 @@ jobs:
     - name: zip raw binary
       shell: pwsh
       run: |
-         Compress-Archive -Path "$env:GITHUB_WORKSPACE\build\percolator-noxml\src\Release\*.exe" -DestinationPath "$env:GITHUB_WORKSPACE\rel\percolator-noxml-windows-portable.zip"
+         Compress-Archive -Path "$env:GITHUB_WORKSPACE\build\percolator\src\Release\*.exe" -DestinationPath "$env:GITHUB_WORKSPACE\rel\percolator-windows-portable.zip"
     - name: Upload packages
       uses: actions/upload-artifact@v4
       with:
         name: windows-packages
-        path: ${{ github.workspace }}/rel/percolator-noxml-windows-portable.zip
+        path: ${{ github.workspace }}/rel/percolator-windows-portable.zip

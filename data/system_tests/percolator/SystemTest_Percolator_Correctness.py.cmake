@@ -43,11 +43,10 @@ def canPercRunThisTab(testName,flags,testFile):
 def canPercRunThis(testName,flags,testFile,testFileFlag="",checkValidXml=True):
   success = True
   outputPath = os.path.join(pathToOutputData,"PERCOLATOR_"+testName)
-  xmlOutput = doubleQuote(outputPath + ".pout.xml")
   txtOutput = doubleQuote(outputPath + ".txt")
   readPath = doubleQuote(os.path.join(pathToData, testFile))
   percExe = doubleQuote(os.path.join(pathToBinaries, "percolator"))
-  cmd = ' '.join([percExe, testFileFlag, readPath, '-S 2 -X', xmlOutput, flags, '>', txtOutput,'2>&1'])
+  cmd = ' '.join([percExe, testFileFlag, readPath, '-S 2', flags, '>', txtOutput,'2>&1'])
   processFile = os.popen(cmd)
   exitStatus = processFile.close()
   if exitStatus is not None:
@@ -55,8 +54,6 @@ def canPercRunThis(testName,flags,testFile,testFileFlag="",checkValidXml=True):
     print("...TEST FAILED: percolator ("+testName+") terminated with " + os.strerror(exitStatus) + " exit status")
     print("check "+ txtOutput +" for details")
     success = False
-  if checkValidXml:
-    success = success and validate(testName,xmlOutput)
   return success
 
 # puts double quotes around the input string, needed for windows shell
@@ -65,25 +62,6 @@ def doubleQuote(path):
 
 
 T = Tester()
-
-if xmlSupport:
-  print("- PERCOLATOR PIN XML FORMAT")
-
-  print("(*) running percolator to calculate psm probabilities...")
-  T.doTest(canPercRunThisXml("psms","-y -U","percolator/pin/pin.xml"))
-
-  print("(*) running percolator to calculate peptide probabilities...")
-  T.doTest(canPercRunThisXml("peptides","-y","percolator/pin/pin.xml"))
-
-  print("(*) running percolator to calculate protein probabilities with picked-protein...")
-  T.doTest(canPercRunThisXml("proteins","-f auto -P decoy_","percolator/pin/pin.xml"))
-
-  print("(*) running percolator with subset training option...")
-  T.doTest(canPercRunThisXml("subset_training","-y -N 1000 -U","percolator/pin/pin.xml"))
-  
-  print("(*) running percolator to generate tab-delimited input...")
-  tabData=os.path.join(pathToOutputData, "percolatorTab ")
-  T.doTest(canPercRunThis("tab_generate","-y -U -J " + tabData,"percolator/pin/pin.xml","-k",False))
 
 # running percolator with option to process tab-delimited input
 print("- PERCOLATOR TAB FORMAT")

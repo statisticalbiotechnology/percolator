@@ -60,19 +60,19 @@ bool PickedProteinCaller::parseOptions(int argc, char** argv) {
   // define available options
   cmd.defineOption("v",
                    "verbose",
-                   "Set verbosity of output: 0 = no processing info, 5 = all, default is 2.",
+                   "Set verbosity of output: 0=no processing info, 5=all. Default = 2.",
                    "level");
   cmd.defineOption("i",
                    "peptide-in",
-                   "Specifies the file with the peptide tab-delimited output file from percolator.",
+                   "Tab-delimited peptide results file from Percolator.",
                    "filename");
   cmd.defineOption("d",
                    "database",
-                   "Specifies the file with protein sequences in fasta format.",
+                   "Protein sequence database in FASTA format.",
                    "filename");
   cmd.defineOption("o",
                    "protein-out",
-                   "Specifies the file with the inferred proteins.",
+                   "Output file for inferred protein results.",
                    "filename");
 
   cmd.parseArgs(argc, argv);

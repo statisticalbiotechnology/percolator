@@ -518,10 +518,6 @@ void PickedProteinInterface::estimatePEPs() {
   }
 }
 
-std::ostream& PickedProteinInterface::printParametersXML(std::ostream &os) {
-  return os;
-}
-
 string PickedProteinInterface::printCopyright() {
   ostringstream oss;
   return oss.str();

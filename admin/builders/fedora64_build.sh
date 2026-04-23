@@ -31,31 +31,20 @@ echo "The Builder $0 is building the Percolator packages with src=${src_dir} and
 whoami;
 
 sudo dnf install -y gcc gcc-c++ make cmake wget rpm-build
-sudo dnf install -y tokyocabinet-devel boost-static boost-devel sqlite-devel zlib-devel bzip2-devel xerces-c-devel xsd
+sudo dnf install -y boost-static boost-devel zlib-devel bzip2-devel
 
 cd ${src_dir}
 
 # download, compile and link percolator
 
-mkdir -p ${build_dir}/percolator-noxml
-cd ${build_dir}/percolator-noxml
-cmake -DTARGET_ARCH=x86_64 -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr -DXML_SUPPORT=OFF ${src_dir}/percolator
-make -j 4;
-make -j 4 package;
-
 mkdir -p ${build_dir}/percolator
 cd ${build_dir}/percolator
-cmake -DTARGET_ARCH=x86_64 -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr -DXML_SUPPORT=ON ${src_dir}/percolator
+cmake -DTARGET_ARCH=x86_64 -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr ${src_dir}/percolator
 make -j 4;
-make -j 4 package;
-
-mkdir -p ${build_dir}/converters
-cd ${build_dir}/converters
-cmake -DTARGET_ARCH=x86_64 -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/usr -DSERIALIZE="TokyoCabinet" ${src_dir}/percolator/src/converters
-make -j 4;
+make test
 make -j 4 package;
 
 echo "build directory was : ${build_dir}";
 
-cp -v ${build_dir}/{percolator-noxml,percolator,converters}/*.rpm ${release_dir};
+cp -v ${build_dir}/percolator/percolator*.rpm ${release_dir};
 

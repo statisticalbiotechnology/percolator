@@ -1,4 +1,4 @@
-set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD 17)
 
 include(FetchContent)
 
@@ -21,10 +21,7 @@ FetchContent_Declare(
   GIT_REPOSITORY https://github.com/google/googletest.git
   GIT_TAG v1.16.0
 )
-FetchContent_Populate(googletest)
-
-# This is the correct way to build the actual library
-add_subdirectory(${googletest_SOURCE_DIR} ${googletest_BINARY_DIR})
+FetchContent_MakeAvailable(googletest)
 
 # Optional: apply RTTI to gtest explicitly (not usually needed if add_compile_options is set globally)
 # target_compile_options(gtest PRIVATE -frtti)
@@ -67,6 +64,7 @@ add_executable(gtest_unit
     UnitTest_Percolator_SetHandler.cpp
     UnitTest_Percolator_DataSet.cpp
     UnitTest_Percolator_IsplineRegression.cpp
+    UnitTest_Percolator_InferPep.cpp
     UnitTest_Percolator_Scores.cpp
     UnitTest_Percolator_CrossValidation.cpp
 )
