@@ -34,8 +34,9 @@ whoami
 
 ${SUDO} dnf -y install gcc gcc-c++ wget rpm-build cmake
 ${SUDO} dnf -y install zlib-devel bzip2-devel
-${SUDO} dnf -y --enablerepo=crb install gtest gtest-devel
-${SUDO} dnf -y install boost-static boost-devel
+${SUDO} dnf -y install epel-release
+${SUDO} dnf -y install gtest-devel
+${SUDO} dnf -y install boost-devel
 
 cd ${src_dir}
 
