@@ -1,5 +1,7 @@
 #!/bin/bash
 
+[ "$(id -u)" -eq 0 ] && SUDO="" || SUDO="sudo"
+
 # managing input arguments
 while getopts "s:b:r:t:" OPTION; do
   case $OPTION in
@@ -16,7 +18,7 @@ if [[ -z ${build_dir} ]]; then
 fi
 if [[ -z ${src_dir} ]]; then
   if [[ -n  ${branch} ]]; then
-    sudo dnf -y install git
+    ${SUDO} dnf -y install git
     src_dir="$(mktemp -d --tmpdir build_XXXX)"
     git clone --branch "$1" https://github.com/percolator/percolator.git "${src_dir}/percolator"
   else
@@ -30,10 +32,10 @@ fi
 echo "The Builder $0 is building the Percolator packages with src=${src_dir} and build=${build_dir} for the user"
 whoami
 
-sudo dnf -y install gcc gcc-c++ wget rpm-build cmake
-sudo dnf -y install zlib-devel bzip2-devel
-sudo dnf -y --enablerepo=crb install gtest gtest-devel
-sudo dnf -y install boost-static boost-devel
+${SUDO} dnf -y install gcc gcc-c++ wget rpm-build cmake
+${SUDO} dnf -y install zlib-devel bzip2-devel
+${SUDO} dnf -y --enablerepo=crb install gtest gtest-devel
+${SUDO} dnf -y install boost-static boost-devel
 
 cd ${src_dir}
 
