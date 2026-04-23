@@ -32,6 +32,8 @@ fi
 echo "The Builder $0 is building the Percolator packages with src=${src_dir} and build=${build_dir} for the user"
 whoami
 
+${SUDO} dnf clean all
+${SUDO} dnf -y distro-sync
 ${SUDO} dnf -y install gcc gcc-c++ wget rpm-build cmake
 ${SUDO} dnf -y install zlib-devel bzip2-devel
 ${SUDO} dnf -y install epel-release
