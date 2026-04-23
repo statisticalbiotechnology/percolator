@@ -50,7 +50,7 @@ echo "cmake percolator ....."
 mkdir -p ${build_dir}/percolator
 cd ${build_dir}/percolator
 (set -x; \
-cmake -DTARGET_ARCH=x86_64 -DCMAKE_BUILD_TYPE=Release -DGOOGLE_TEST=1 -DCMAKE_INSTALL_PREFIX=/usr ${src_dir}/percolator; \
+cmake -DTARGET_ARCH=x86_64 -DCMAKE_BUILD_TYPE=Release -DGOOGLE_TEST=1 -DCMAKE_INSTALL_PREFIX=/usr -DCPACK_GENERATOR=RPM ${src_dir}/percolator; \
 )
 make -j 4
 make test
@@ -58,4 +58,4 @@ make -j 4 package
 
 echo "build directory was : ${build_dir}"
 
-cp -v ${build_dir}/percolator*.rpm ${release_dir}
+cp -v ${build_dir}/percolator/percolator*.rpm ${release_dir}
