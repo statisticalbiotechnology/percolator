@@ -21,10 +21,7 @@ FetchContent_Declare(
   GIT_REPOSITORY https://github.com/google/googletest.git
   GIT_TAG v1.16.0
 )
-FetchContent_Populate(googletest)
-
-# This is the correct way to build the actual library
-add_subdirectory(${googletest_SOURCE_DIR} ${googletest_BINARY_DIR})
+FetchContent_MakeAvailable(googletest)
 
 # Optional: apply RTTI to gtest explicitly (not usually needed if add_compile_options is set globally)
 # target_compile_options(gtest PRIVATE -frtti)

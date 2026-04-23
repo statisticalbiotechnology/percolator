@@ -82,7 +82,8 @@ inline TRStep steihaugCG(const MatrixXd& H,
   bool hit_boundary = false;
 
   const double eps = 1e-12;
-  while (rr > eps) {
+  const int max_cg_iters = static_cast<int>(F.size());
+  for (int cg_iter = 0; cg_iter < max_cg_iters && rr > eps; ++cg_iter) {
     VectorXd Hd = Hmul(d);
     double dHd = d.dot(Hd);
     if (dHd <= 0) {

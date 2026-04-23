@@ -122,8 +122,6 @@ set(EIGEN_BUILD_PKGCONFIG OFF CACHE BOOL "" FORCE)
 
 if(NOT OpenMP_CXX_FOUND)
   message(STATUS "OpenMP not found; building Eigen without it")
-  # Optional: keep Eigen single-threaded to avoid surprise
-  set(EIGEN_DONT_PARALLELIZE 1)
 endif()
 
 # Avoid adding Eigen's blas directory (explicitly ignore it)

@@ -91,9 +91,9 @@ d build=${build_dir} for user" `whoami`
 $package_manager install $other_packages
 $package_manager install $boost_install_options
 
-if [[ -f /usr/local/bin/brew || -f /opt/homebrew/bin/brew ]]  
+if [[ -f /usr/local/bin/brew || -f /opt/homebrew/bin/brew ]]
   then
-  export HOMEBREW_PREFIX="/opt/homebrew"
+  export HOMEBREW_PREFIX="$(brew --prefix)"
   export OMP_PREFIX="$HOMEBREW_PREFIX/opt/libomp"
 
   # Make omp.h and libomp visible
