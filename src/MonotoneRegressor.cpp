@@ -1,8 +1,7 @@
 #include "MonotoneRegressor.h"
 #include "PAVARegressor.h"
 #include "ISplineTRRRegressor.h"
-// Factory
-// Forward-defined concrete classes
+#include <stdexcept>
 
 std::unique_ptr<MonotoneRegressor> make_monotone_regressor(RegressorType type) {
   std::unique_ptr<MonotoneRegressor> ptr;
@@ -13,6 +12,8 @@ std::unique_ptr<MonotoneRegressor> make_monotone_regressor(RegressorType type) {
     case RegressorType::ISPLINE_TRR:
       ptr = std::unique_ptr<MonotoneRegressor>(new ISplineTRRRegressor());
       break;
+    default:
+      throw std::invalid_argument("make_monotone_regressor: unsupported RegressorType");
   }
   ptr->set_params(MonotoneParams());
   return ptr;

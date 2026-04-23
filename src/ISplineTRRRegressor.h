@@ -195,7 +195,8 @@ inline TRRResult trr_boxed_qp(const QuadraticModel& q,
     double f_old = cg.f;
     double f_new = costGrad(q, x_trial).f;
     double ared = f_old - f_new;
-    double pred = st.pred_red * alphaBox; // linear model along clamped step (good enough)
+    VectorXd s = alphaBox * st.p;
+    double pred = -(cg.g.dot(s) + 0.5 * s.dot(H * s));
     double rho = (pred > 0.0) ? (ared / pred) : -std::numeric_limits<double>::infinity();
 
     // Update trust region
@@ -297,7 +298,9 @@ inline Eigen::MatrixXd build_ispline_design(
     }
 
     // De Boor triangular recursion: compute B_{k-d}(x), ..., B_k(x)
-    double B[32]; // supports degree up to 31
+    static constexpr int kMaxDegree = 31;
+    assert(d <= kMaxDegree && "ispline_degree must be <= 31");
+    double B[kMaxDegree + 1];
     B[0] = 1.0;
     for (int j = 1; j <= d; ++j) {
       double saved = 0.0;
@@ -314,7 +317,7 @@ inline Eigen::MatrixXd build_ispline_design(
     // B[r] == B_{k-d+r, d}(x)  for r = 0, ..., d
 
     // Cumulative sum from right: cum[r] = sum_{s=r}^{d} B[s]
-    double cum[32];
+    double cum[kMaxDegree + 1];
     cum[d] = B[d];
     for (int r = d - 1; r >= 0; --r) {
       cum[r] = cum[r + 1] + B[r];
