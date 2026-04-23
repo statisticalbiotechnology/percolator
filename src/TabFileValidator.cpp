@@ -20,21 +20,27 @@
 bool TabFileValidator::isTabFile(std::string fileName) {
   std::ifstream file(fileName.c_str());
   
-  if (!file.is_open()) return false;
+  if (!file.is_open()) {
+    if (VERB > 0) {
+      std::cerr << "ERROR: Unable to read " << fileName << ", check if the file exists." << std::endl;
+    }
+    return false;
+  }
   
   std::string tmp;
   std::istream &in = std::getline(file, tmp);
   
   if (!in) {
     if (VERB > 0) {
-      std::cerr << "Cannot read " << fileName << "!" << std::endl;
+      std::cerr << "ERROR: Unable to read " << fileName << ", check if you have permission to read the file." << std::endl;
     }
     return false;
   }
+  
   // try to find a '\t', return true if '\t' is found within the string
   bool isTab = std::find(tmp.begin(), tmp.end(), '\t')!= tmp.end();
   if (!isTab && VERB > 0) {
-    std::cerr << fileName << " is not tab delimited!\n" << std::endl;
+    std::cerr << "ERROR: " << fileName << " is not tab delimited." << std::endl;
   }
   return isTab;
 }
@@ -177,6 +183,10 @@ std::string TabFileValidator::detectDecoyPrefix(std::string fileName) {
 }
 
 bool TabFileValidator::validateTabFiles(std::vector<std::string> files, std::string& decoyPrefix) {
+  if (!isTabFiles(files)) {
+    return false;
+  }
+  
   if (decoyPrefix == "auto") {
     std::string tmpDecoyPrefix = getDecoyPrefix(files);
     if (tmpDecoyPrefix == "error") {
@@ -185,8 +195,5 @@ bool TabFileValidator::validateTabFiles(std::vector<std::string> files, std::str
     decoyPrefix = tmpDecoyPrefix;
   }
   
-  if (!isTabFiles(files)) {
-    return false;
-  }
   return true;
 }
