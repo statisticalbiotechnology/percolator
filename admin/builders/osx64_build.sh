@@ -39,14 +39,14 @@ elif [[ -f ${HOME}/bin/brew ]]
     echo "[ Package manager ] : Homebrew "
     package_manager=$HOME/bin/brew
     boost_install_options="boost"
-    other_packages="lbzip2 pbzip2 lzlib llvm libomp"
-elif [[ -f /usr/local/bin/brew || -f /opt/homebrew/bin/brew ]]  
+    other_packages="pbzip2 lzlib llvm libomp"
+elif [[ -f /usr/local/bin/brew || -f /opt/homebrew/bin/brew ]]
   then
     echo "[ Package manager ] : Homebrew "
     package_manager="brew"
     ${package_manager} update || true # brew.rb raises an error on the vagrant box, just ignore it
     boost_install_options="boost"
-    other_packages="lbzip2 pbzip2 lzlib llvm libomp"
+    other_packages="pbzip2 lzlib llvm libomp"
 else
     package_manager_installed=false
 fi

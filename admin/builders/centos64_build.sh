@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # managing input arguments
-while getopts “s:b:r:t:” OPTION; do
+while getopts "s:b:r:t:" OPTION; do
   case $OPTION in
     s) src_dir=${OPTARG};;
     t) branch=${OPTARG};;
@@ -16,7 +16,7 @@ if [[ -z ${build_dir} ]]; then
 fi
 if [[ -z ${src_dir} ]]; then
   if [[ -n  ${branch} ]]; then
-    sudo apt-get install git
+    sudo dnf -y install git
     src_dir="$(mktemp -d --tmpdir build_XXXX)"
     git clone --branch "$1" https://github.com/percolator/percolator.git "${src_dir}/percolator"
   else
@@ -31,29 +31,11 @@ echo "The Builder $0 is building the Percolator packages with src=${src_dir} and
 whoami
 
 sudo dnf -y install gcc gcc-c++ wget rpm-build cmake
-sudo dnf install zlib-devel bzip2-devel
-sudo dnf -y --enablerepo=powertools install gtest
+sudo dnf -y install zlib-devel bzip2-devel
+sudo dnf -y --enablerepo=crb install gtest gtest-devel
+sudo dnf -y install boost-static boost-devel
 
 cd ${src_dir}
-
-# read all urls and file names from a centralized kb file
-source percolator/admin/builders/_urls_and_file_names_.sh
-
-cd ${build_dir}
-
-# download and install boost for CentOS < 8, since these install boost <= 1.56 which has problems with the header only library includes
-if [[ $(rpm -q --queryformat '%{VERSION}' centos-release) < 8 ]]; then
-  if [ ! -d ${centos_boost} ]; then
-    echo "  Installing boost"
-    wget --quiet -O ${centos_boost}.tar.bz2 ${centos_boost_url}
-    tar xjf ${centos_boost}.tar.bz2
-    cd ${centos_boost}/
-    ./bootstrap.sh
-    ./b2 address-model=64 threading=multi -j4 --with-system --with-filesystem --with-serialization -d0
-  fi
-else
-  sudo yum install -y boost-static boost-devel
-fi
 
 # download, compile and link percolator
 
@@ -63,7 +45,7 @@ echo "cmake percolator ....."
 mkdir -p ${build_dir}/percolator
 cd ${build_dir}/percolator
 (set -x; \
-cmake -DTARGET_ARCH=x86_64 -DCMAKE_BUILD_TYPE=Release -DGOOGLE_TEST=1 -DCMAKE_INSTALL_PREFIX=/usr -DCMAKE_PREFIX_PATH="${build_dir}/${centos_boost}" ${src_dir}/percolator; \
+cmake -DTARGET_ARCH=x86_64 -DCMAKE_BUILD_TYPE=Release -DGOOGLE_TEST=1 -DCMAKE_INSTALL_PREFIX=/usr ${src_dir}/percolator; \
 )
 make -j 4
 make test
