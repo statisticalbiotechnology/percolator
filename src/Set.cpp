@@ -62,6 +62,8 @@ Set Set::reindexTo(const Set & base) {
       throw InvalidBaseException();
     }
   }
+  if (iter != end())
+    throw InvalidBaseException();
   return C;
 }
 

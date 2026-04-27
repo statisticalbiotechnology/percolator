@@ -490,7 +490,7 @@ double PosteriorEstimator::estimatePi0(vector<double>& p,
         std::cerr << "No-terminate flag set: setting pi0 = 1 and ignoring error." << std::endl;
         return 1.0;
       } else {
-        std::cerr << "No-terminate flag set: ignoring error." << std::endl;
+        throw MyException(oss.str() + "Cannot continue without pi0 estimate. Terminating.\n");
       }
     } else {
       throw MyException(oss.str() + "Terminating.\n");

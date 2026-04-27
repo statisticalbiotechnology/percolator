@@ -42,8 +42,6 @@
 #include "PseudoRandom.h"
 #include "FeatureMemoryPool.h"
 
-using namespace std;
-
 struct PSMDescriptionPriority {
   PSMDescription* psm;
   size_t priority;
@@ -107,7 +105,7 @@ class SetHandler {
 
  protected:
   size_t maxPSMs_;
-  vector<DataSet*> subsets_;
+  std::vector<DataSet*> subsets_;
   FeatureMemoryPool featurePool_;
   std::string decoyPrefix_; // Used to determine if a psm is a decoy
   
@@ -125,10 +123,10 @@ class SetHandler {
   ScanId getScanId(const std::string& psmLine, int& label,
     std::vector<OptionalField>& optionalFields, unsigned int lineNr);
     
-  void readPSMs(istream& dataStream, std::string& psmLine, 
+  void readPSMs(std::istream& dataStream, std::string& psmLine,
     bool hasInitialValueRow, bool& separateSearches,
     std::vector<OptionalField>& optionalFields);
-  void readAndScorePSMs(istream& dataStream, std::string& psmLine, 
+  void readAndScorePSMs(std::istream& dataStream, std::string& psmLine,
     bool hasInitialValueRow, std::vector<OptionalField>& optionalFields, 
     std::vector<double>& rawWeights, Scores& allScores);
 };
