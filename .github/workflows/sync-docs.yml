@@ -16,13 +16,13 @@ jobs:
     if: github.repository == 'percolator/percolator'
     steps:
       - name: Checkout percolator
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Generate interface documentation
         run: python3 doc/generate_interface_doc.py > /tmp/interface.textile
 
       - name: Checkout docs repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           repository: percolator/percolator.github.com
           path: percolator.github.com
@@ -32,7 +32,7 @@ jobs:
         run: cp /tmp/interface.textile percolator.github.com/_posts/2010-10-27-interface.textile
 
       - name: Create pull request
-        uses: peter-evans/create-pull-request@v7
+        uses: peter-evans/create-pull-request@v8
         with:
           token: ${{ secrets.DOCS_REPO_TOKEN }}
           path: percolator.github.com
