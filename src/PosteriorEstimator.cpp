@@ -102,22 +102,18 @@ void PosteriorEstimator::estimatePEP(vector<pair<double, bool> >& combined,
   copy(xvals.begin(), xvals.end(), xvalIt);
 #endif
   if (peps.size() == 0) return;
-  
-  double top = min(1.0, exp(*max_element(peps.begin(), peps.end())));
-  vector<double>::iterator pep = peps.begin();
-  bool crap = false;
-  for (; pep != peps.end(); ++pep) {
-    if (crap) {
-      *pep = top;
-      continue;
-    }
-    *pep = exp(*pep);
-    if (*pep >= top) {
-      *pep = top;
-      crap = true;
-    }
+
+  // BENCHMARK BUILD (no_monotone branch): the standard percolator PEP
+  // estimation applies a post-hoc monotonization step here -- a running
+  // minimum over the spline PEPs (partial_sum with mymin), plus pinning all
+  // PEPs to the maximum once it is first reached. That monotonization is NOT
+  // part of the P-IRLS method itself, so it is disabled on this branch to
+  // expose the raw P-IRLS spline PEPs for the paper's Figure 1. We still
+  // exponentiate the predicted log-PEPs and cap them at 1 so the reported
+  // values remain valid probabilities.
+  for (vector<double>::iterator pep = peps.begin(); pep != peps.end(); ++pep) {
+    *pep = min(1.0, exp(*pep));
   }
-  partial_sum(peps.rbegin(), peps.rend(), peps.rbegin(), mymin);
 }
 
 void PosteriorEstimator::estimate(vector<pair<double, bool> >& combined,
