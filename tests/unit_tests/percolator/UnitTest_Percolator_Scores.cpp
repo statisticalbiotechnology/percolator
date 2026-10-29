@@ -222,3 +222,59 @@ TEST_F(ScoresTest, CheckPopulatingEmpty)
     setHandler.push_back_dataset(set2);
     EXPECT_THROW(scores.populateWithPSMs(setHandler), MyException);
 }
+
+// countTargetsBelowFdr must report the same number of targets below the FDR
+// threshold as calcScoresAndQvals, also with many tied scores, with and
+// without the mix-max correction.
+TEST(ScoresCountTest, CountTargetsBelowFdrMatchesCalcScoresAndQvals)
+{
+    const size_t numFeatures = 2;
+    FeatureNames::resetNumFeatures();
+    FeatureNames::setNumFeatures(numFeatures);
+    const int numPsms = 2000;
+    std::vector<double> features(numPsms * numFeatures);
+    std::vector<PSMDescription*> psms;
+    for (bool usePi0 : {false, true}) {
+        Scores scores(usePi0);
+        unsigned int seed = 12345u;
+        for (int i = 0; i < numPsms; ++i) {
+            seed = seed * 1103515245u + 12345u;
+            bool isTarget = (seed >> 16) % 2 == 0;
+            double* row = &features[i * numFeatures];
+            // coarse values, so that many PSMs get exactly the same score
+            row[0] = static_cast<double>((seed >> 8) % 7) + (isTarget ? 3 : 0);
+            row[1] = static_cast<double>((seed >> 4) % 3);
+            PSMDescription* psm = new PSMDescription();
+            psm->features = row;
+            psm->scan = i / 2;
+            psms.push_back(psm);
+            scores.addScoreHolder(ScoreHolder(0.0,
+                isTarget ? LabelType::TARGET : LabelType::DECOY, psm));
+        }
+        scores.recalculateSizes();
+        std::vector<double> w = {1.0, -0.5, 0.25};
+        scores.calcScores(w);
+        scores.postMergeStep();  // sets pi0 when usePi0 is true
+        if (usePi0) {
+            ASSERT_LT(scores.getPi0(), 1.0);
+        }
+        Scores::FeatureRows rows;
+        scores.getFeatureRows(rows);
+        std::vector<std::pair<double, bool> > combined;
+        for (double fdr : {0.01, 0.05, 0.2}) {
+            for (bool skipDecoysPlusOne : {false, true}) {
+                int count = scores.countTargetsBelowFdr(
+                    rows, w, fdr, skipDecoysPlusOne, combined);
+                EXPECT_EQ(scores.calcScoresAndQvals(w, fdr, skipDecoysPlusOne),
+                          count);
+                if (fdr > 0.1) {
+                    EXPECT_GT(count, 0);  // the test needs accepted targets
+                }
+            }
+        }
+    }
+    for (PSMDescription* psm : psms) {
+        delete psm;
+    }
+    FeatureNames::resetNumFeatures();
+}
