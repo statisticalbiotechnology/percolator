@@ -19,6 +19,7 @@
 #include <iostream>
 #include <map>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "Enzyme.h"
@@ -55,6 +56,10 @@ class PSMDescription {
     }
 
     std::string getPeptideSequence() { return peptide.substr(2, peptide.size() - 4); }
+    // same as getPeptideSequence, without copying
+    std::string_view getPeptideSequenceView() const {
+        return std::string_view(peptide).substr(2, peptide.size() - 4);
+    }
     std::string& getFullPeptideSequence() { return peptide; }
     std::string getFlankN() { return peptide.substr(0, 1); }
     std::string getFlankC() { return peptide.substr(peptide.size() - 1, peptide.size()); }

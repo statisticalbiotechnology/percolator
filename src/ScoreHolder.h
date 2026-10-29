@@ -76,7 +76,7 @@ inline bool operator<(const ScoreHolder& one, const ScoreHolder& other) {
 }
 
 struct lexicOrderProb {
-  static int compStrIt(const std::string& sv1, const std::string& sv2) {
+  static int compStrIt(std::string_view sv1, std::string_view sv2) {
     auto it1 = sv1.begin(), end1 = sv1.end();
     auto it2 = sv2.begin(), end2 = sv2.end();
 
@@ -94,13 +94,8 @@ struct lexicOrderProb {
   }
 
   bool operator()(const ScoreHolder& x, const ScoreHolder& y) const {
-    const std::string& fullSeqX = x.pPSM->getFullPeptideSequence();
-    const std::string& fullSeqY = y.pPSM->getFullPeptideSequence();
-
-    std::string peptSeqX = fullSeqX.substr(2, fullSeqX.size() - 4);
-    std::string peptSeqY = fullSeqY.substr(2, fullSeqY.size() - 4);
-
-    int peptCmp = compStrIt(peptSeqX, peptSeqY);
+    int peptCmp = compStrIt(x.pPSM->getPeptideSequenceView(),
+                            y.pPSM->getPeptideSequenceView());
     return ((peptCmp == 1) || ((peptCmp == 0) && (x.label > y.label)) ||
             ((peptCmp == 0) && (x.label == y.label) && (x.score > y.score)));
   }
@@ -146,20 +141,6 @@ struct OrderScanMassCharge {
   }
 };
 
-struct OrderScanMassLabelCharge {
-  bool operator()(const ScoreHolder& x, const ScoreHolder& y) const {
-    if (x.pPSM->specFileNr != y.pPSM->specFileNr)
-      return x.pPSM->specFileNr < y.pPSM->specFileNr;
-    if (x.pPSM->scan != y.pPSM->scan)
-      return x.pPSM->scan < y.pPSM->scan;
-    if (x.pPSM->expMass != y.pPSM->expMass)
-      return x.pPSM->expMass < y.pPSM->expMass;
-    if (x.label != y.label)
-      return x.label > y.label;
-    return x.score > y.score;
-  }
-};
-
 struct OrderScanLabel {
   bool operator()(const ScoreHolder& x, const ScoreHolder& y) const {
     if (x.pPSM->specFileNr != y.pPSM->specFileNr)
@@ -174,14 +155,6 @@ struct UniqueScanMassCharge {
   bool operator()(const ScoreHolder& x, const ScoreHolder& y) const {
     return (x.pPSM->specFileNr == y.pPSM->specFileNr) &&
            (x.pPSM->scan == y.pPSM->scan) &&
-           (x.pPSM->expMass == y.pPSM->expMass);
-  }
-};
-
-struct UniqueScanMassLabelCharge {
-  bool operator()(const ScoreHolder& x, const ScoreHolder& y) const {
-    return (x.pPSM->specFileNr == y.pPSM->specFileNr) &&
-           (x.pPSM->scan == y.pPSM->scan) && (x.label == y.label) &&
            (x.pPSM->expMass == y.pPSM->expMass);
   }
 };

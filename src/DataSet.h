@@ -65,8 +65,6 @@ class DataSet {
   
   bool writeTabData(std::ofstream& out);
   
-  void print_10features();
-  void print_features();
 
   void fillScores(std::vector<ScoreHolder>& scores);
   void fillFeatures(std::vector<double*>& features);

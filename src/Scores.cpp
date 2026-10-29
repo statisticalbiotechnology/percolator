@@ -530,17 +530,13 @@ void Scores::weedOutRedundant(
   // scores)
   std::sort(scores_.begin(), scores_.end(), lexicOrderProb());
 
-  /*
-   * much simpler version but it does not fill up the peptide-PSM map:
-   * scores_.erase(std::unique(scores_.begin(), scores_.end(), mycmp),
-   * scores_.end());
-   */
-
-  std::string previousPeptide = "";
+  // the views point into the PSMs, which stay in place
+  std::string_view previousPeptide = "";
   LabelType previousLabel = LabelType::UNDEFINED;
   size_t lastWrittenIdx = 0u;
   for (size_t idx = 0u; idx < scores_.size(); ++idx) {
-    std::string currentPeptide = scores_[idx].pPSM->getPeptideSequence();
+    std::string_view currentPeptide =
+        scores_[idx].pPSM->getPeptideSequenceView();
     LabelType currentLabel = scores_[idx].label;
     if (currentPeptide != previousPeptide || currentLabel != previousLabel) {
       // insert as a new score
@@ -548,12 +544,9 @@ void Scores::weedOutRedundant(
       previousPeptide = currentPeptide;
       previousLabel = currentLabel;
     }
-    // append the psm
-    peptidePsmMap_[scores_[lastWrittenIdx - 1].pPSM].push_back(
-        scores_[idx].pPSM);
     if (specCountQvalThreshold > 0.0 &&
         scores_[idx].q < specCountQvalThreshold) {
-      ++peptideSpecCounts[currentPeptide];
+      ++peptideSpecCounts[std::string(currentPeptide)];
     }
   }
   scores_.resize(lastWrittenIdx);
@@ -588,20 +581,6 @@ void Scores::weedOutRedundantTDC() {
   }
   scores_.resize(lastWrittenIdx);
   */
-  postMergeStep();
-}
-
-/**
- * Routine that sees to that only 1 target and 1 decoy spectra are kept for
- * mix-max when using multiple hits per spectrum and separate searches
- */
-void Scores::weedOutRedundantMixMax() {
-  // order the scores (based on spectra id and score)
-  std::sort(scores_.begin(), scores_.end(), OrderScanMassLabelCharge());
-  scores_.erase(
-      std::unique(scores_.begin(), scores_.end(), UniqueScanMassLabelCharge()),
-      scores_.end());
-
   postMergeStep();
 }
 

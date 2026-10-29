@@ -55,25 +55,6 @@ bool DataSet::writeTabData(ofstream& out) {
   return true;
 }
 
-void DataSet::print_features() {
-  for (std::size_t i = 0; i < getSize(); i++) {
-    for (std::size_t j = 0; j < FeatureNames::getNumFeatures(); j++) {
-      cerr << j + 1 << ":" << psms_[i]->features[j] << " ";
-    }
-    cerr << endl;
-  }
-}
-
-void DataSet::print_10features() {
-  cerr << DataSet::getFeatureNames().getFeatureNames() << endl;
-  for (std::size_t i = 0; i < 10; i++) {
-    for (std::size_t j = 0; j < FeatureNames::getNumFeatures(); j++) {
-      cerr << psms_[i]->features[j] << "\t";
-    }
-    cerr << endl;
-  }
-}
-
 // TODO: find a way to make these three functions generic
 void DataSet::fillScores(std::vector<ScoreHolder>& scores) {
   std::vector<PSMDescription*>::iterator it = psms_.begin();

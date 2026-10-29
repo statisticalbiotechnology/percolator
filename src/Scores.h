@@ -107,7 +107,6 @@ class Scores {
   void weedOutRedundant(std::map<std::string, unsigned int>& peptideSpecCounts,
                         double specCountQvalThreshold);
   void weedOutRedundantTDC();
-  void weedOutRedundantMixMax();
 
   void printRetentionTime(ostream& outs, double fdr);
   unsigned getQvaluesBelowLevel(double level);
@@ -131,10 +130,6 @@ class Scores {
     nullTargetWinProb_ = nullTargetWinProb;
   }
 
-  std::vector<PSMDescription*>& getPsms(PSMDescription* pPSM) {
-    return peptidePsmMap_[pPSM];
-  }
-
   void reset() {
     scores_.clear();
     totalNumberOfTargets_ = 0;
@@ -153,7 +148,6 @@ class Scores {
   unsigned int totalNumberOfDecoys_, totalNumberOfTargets_;
 
   std::vector<ScoreHolder> scores_;
-  std::map<PSMDescription*, std::vector<PSMDescription*> > peptidePsmMap_;
 
   void getScoreLabelPairs(std::vector<std::pair<double, bool> >& combined);
   int calcQvals(double fdr, bool skipDecoysPlusOne,

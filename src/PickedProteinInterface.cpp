@@ -258,12 +258,14 @@ void PickedProteinInterface::groupProteins(Scores& peptideScores,
             protIt != peptideIt->pPSM->proteinIds.end(); protIt++) {
       std::string proteinId = *protIt;
       
-      if (fragment_map.find(proteinId) != fragment_map.end()) {
+      auto fragmentIt = fragment_map.find(proteinId);
+      auto duplicateIt = duplicate_map.find(proteinId);
+      if (fragmentIt != fragment_map.end()) {
         if (reportFragmentProteins_) proteinsInGroup.insert(*protIt);
-        proteinId = fragment_map[proteinId];
-      } else if (duplicate_map.find(proteinId) != duplicate_map.end()) {
+        proteinId = fragmentIt->second;
+      } else if (duplicateIt != duplicate_map.end()) {
         if (reportDuplicateProteins_) proteinsInGroup.insert(*protIt);
-        proteinId = duplicate_map[proteinId];
+        proteinId = duplicateIt->second;
       } else {
         proteinsInGroup.insert(*protIt);
       }
@@ -291,7 +293,7 @@ void PickedProteinInterface::groupProteins(Scores& peptideScores,
         ProteinScoreHolder newProtein(lastProteinId, peptideIt->isDecoy(),
             peptide, static_cast<int>(++numGroups));
         proteinToIdxMap_[lastProteinId] = proteins_.size();
-        proteins_.push_back(newProtein);
+        proteins_.push_back(std::move(newProtein));
         if (lastProteinId.find(decoyPattern_) == std::string::npos) {
           ++numberTargetProteins_;
         } else {
@@ -337,7 +339,7 @@ void PickedProteinInterface::computeProbabilities(const std::string& fname) {
   }
   for (std::vector<ProteinScoreHolder>::iterator it = proteins_.begin(); 
         it != proteins_.end(); it++) {
-    const std::vector<ProteinScoreHolder::Peptide> peptides = it->getPeptidesByRef();
+    const std::vector<ProteinScoreHolder::Peptide>& peptides = it->getPeptidesByRef();
     switch (protInferenceMethod_) {
       case FISHER: {
         double fisher = 0.0;
