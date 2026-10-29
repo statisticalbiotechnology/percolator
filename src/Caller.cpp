@@ -167,8 +167,10 @@ bool Caller::parseOptions(int argc, char** argv) {
                    "", TRUE_IF_SET);
   cmd.defineOption("", "classic-training",
                    "Train the SVMs as Percolator 3.09 did: every SVM is "
-                   "solved from zero weights, which takes longer but "
-                   "reproduces earlier results.",
+                   "solved from zero weights with conjugate gradients, Cpos "
+                   "and Cneg are selected in every iteration and all "
+                   "iterations are run, which takes longer but reproduces "
+                   "earlier results.",
                    "", TRUE_IF_SET);
   cmd.defineOption("J", "tab-out",
                    "Output computed features to the specified file in "

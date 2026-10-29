@@ -25,6 +25,11 @@
 #endif
 // checks cross validation convergence in case of quickValidation_
 const double CrossValidation::requiredIncreaseOver2Iterations_ = 0.01;
+// checks convergence in normal (not classic) training
+const double CrossValidation::requiredIncreaseOver2IterationsDefault_ = 0.001;
+// number of iterations in which Cpos and Cneg are selected; afterwards each
+// fold keeps its pair (not in classic training)
+const unsigned int CrossValidation::gridSearchIterations_ = 3u;
 
 CrossValidation::CrossValidation(bool quickValidation,
                                  bool reportPerformanceEachIteration,
@@ -228,9 +233,16 @@ void CrossValidation::train(const Normalizer* pNorm) {
     if (VERB > 3) {
       printAllRawWeightsColumns(cerr, pNorm);
     }
-    if (foundPositives > 0 && foundPositivesOldOld > 0 && quickValidation_ &&
+    // stop when the estimated positives grew by less than a fraction over the
+    // last two iterations; classic training runs all iterations unless
+    // quick validation is used
+    const double requiredIncrease = quickValidation_
+                                        ? requiredIncreaseOver2Iterations_
+                                        : requiredIncreaseOver2IterationsDefault_;
+    if (foundPositives > 0 && foundPositivesOldOld > 0 &&
+        (quickValidation_ || !classicTraining_) &&
         (static_cast<double>(foundPositives - foundPositivesOldOld) <=
-         foundPositivesOldOld * requiredIncreaseOver2Iterations_)) {
+         foundPositivesOldOld * requiredIncrease)) {
       if (VERB > 0) {
         std::cerr << "Performance increase over the last two iterations "
                   << "indicate that the algorithm has converged\n"
@@ -352,6 +364,9 @@ int CrossValidation::doStep(const Normalizer* pNorm, double selectionFdr) {
 #pragma omp parallel for schedule(dynamic, 1) ordered
     for (int pairIdx = 0; pairIdx < classWeightsPerFold_.size(); pairIdx++) {
       CandidateCposCfrac* cpCnFold = &classWeightsPerFold_[pairIdx];
+      if (!isSelectedPair(*cpCnFold)) {
+        continue;
+      }
       const AlgIn& svmInput =
           svmInputs_[cpCnFold->set * nestedXvalBins_ +
                      static_cast<unsigned int>(cpCnFold->nestedSet)];
@@ -454,6 +469,10 @@ int CrossValidation::mergeCpCnPairs(
     const unsigned int nestedSet =
         static_cast<unsigned int>(cpCnPair.nestedSet);
     std::vector<std::pair<double, bool> > combined;
+    if (!isSelectedPair(cpCnPair)) {
+      truePositives[pairIdx] = -1;  // not trained in this iteration
+      continue;
+    }
     truePositives[pairIdx] =
         testSet(cpCnPair.set, nestedSet)
             .countTargetsBelowFdr(
@@ -517,6 +536,24 @@ int CrossValidation::mergeCpCnPairs(
           0.0);
       L2_SVM_MFN(svmInput, pOptions, weights_[set], outputs, bestCposes[set],
                  bestCposes[set] * bestCfracs[set]);
+    }
+  }
+
+  // After the first iterations the selected pairs hardly change, and their
+  // number of positives differs from the other pairs' only by noise. From
+  // then on only the selected pair of each fold is trained.
+  ++iteration_;
+  if (!classicTraining_ && !gridFixed_ && iteration_ >= gridSearchIterations_ &&
+      classWeightsPerFold_.size() > numFolds_ * nestedXvalBins_) {
+    gridFixed_ = true;
+    selectedPairs_.resize(numFolds_);
+    for (unsigned int set = 0; set < numFolds_; ++set) {
+      selectedPairs_[set] = std::make_pair(bestCposes[set], bestCfracs[set]);
+      if (VERB > 1) {
+        std::cerr << "Split " << set + 1 << ": using Cpos=" << bestCposes[set]
+                  << ", Cneg=" << bestCposes[set] * bestCfracs[set]
+                  << " in the remaining iterations" << std::endl;
+      }
     }
   }
 

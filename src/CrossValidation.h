@@ -117,6 +117,18 @@ class CrossValidation {
   double decoyFractionTraining_;
 
   const static double requiredIncreaseOver2Iterations_;
+  const static double requiredIncreaseOver2IterationsDefault_;
+  const static unsigned int gridSearchIterations_;
+
+  // after gridSearchIterations_ only each fold's selected (cpos, cfrac)
+  // pair is trained
+  unsigned int iteration_ = 0;
+  bool gridFixed_ = false;
+  std::vector<std::pair<double, double> > selectedPairs_;
+  bool isSelectedPair(const CandidateCposCfrac& pair) const {
+    return !gridFixed_ || (pair.cpos == selectedPairs_[pair.set].first &&
+                           pair.cfrac == selectedPairs_[pair.set].second);
+  }
 
   unsigned int numFolds_;  // number of folds for cross validation
   std::vector<Scores> trainScores_, testScores_;
