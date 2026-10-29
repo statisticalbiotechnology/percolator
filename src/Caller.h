@@ -78,7 +78,7 @@ class Caller {
   std::string protEstimatorDecoyPrefix_;
 
   // file output parameters
-  std::string tabOutputFN_, pepXMLOutputFN_;
+  std::string tabOutputFN_;
   std::string weightOutputFN_;
   std::string psmResultFN_, peptideResultFN_, proteinResultFN_;
   std::string decoyPsmResultFN_, decoyPeptideResultFN_, decoyProteinResultFN_;
@@ -86,7 +86,6 @@ class Caller {
 
   // report level parameters
   bool reportUniquePeptides_;
-  bool reportPepXML_;
   bool targetDecoyCompetition_;
   bool useMixMax_;
   std::string inputSearchType_;

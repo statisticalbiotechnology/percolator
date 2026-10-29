@@ -45,7 +45,6 @@ Caller::Caller()
       inputFNs_(),
       protEstimatorDecoyPrefix_("auto"),
       tabOutputFN_(""),
-      pepXMLOutputFN_(""),
       weightOutputFN_(""),
       psmResultFN_(""),
       peptideResultFN_(""),
@@ -57,7 +56,6 @@ Caller::Caller()
       useResetAlgorithm_(false),
       useCompositionMatch_(false),
       reportUniquePeptides_(true),
-      reportPepXML_(false),
       targetDecoyCompetition_(false),
       useMixMax_(false),
       inputSearchType_("auto"),
@@ -129,8 +127,8 @@ bool Caller::parseOptions(int argc, char** argv) {
   // available lower case letters:
   // available upper case letters:
   cmd.defineOption("Q", "pepxml-output",
-                   "Write a rudimentary pepXML file with PSM-level statistics "
-                   "to the specified file.",
+                   "No longer supported and ignored, kept for compatibility. "
+                   "Use the tab-delimited result files instead.",
                    "filename");
   cmd.defineOption(
       "", "stdinput-tab",
@@ -407,11 +405,10 @@ bool Caller::parseOptions(int argc, char** argv) {
     Globals::getInstance()->setNoTerminate(true);
   }
 
-  // pepXML
+  // pepXML output was removed together with the XML input
   if (cmd.isOptionSet("pepxml-output")) {
-    pepXMLOutputFN_ = cmd.options["pepxml-output"];
-    checkIsWritable(pepXMLOutputFN_);
-    reportPepXML_ = true;
+    std::cerr << "Warning: pepXML output (-Q/--pepxml-output) is no longer "
+              << "supported, no pepXML file is written." << std::endl;
   }
 
   // filenames for outputting results to file
