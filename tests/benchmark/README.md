@@ -7,6 +7,9 @@ change leaves the results unchanged. They need only the Python standard library.
   for separate or concatenated target-decoy searches.
 - `compare_results.py` compares two result files, either byte for byte
   (`--exact`) or within tolerances on accepted targets, q-values and PEPs.
+- `pep_calibration.py` checks PEP and q-value calibration of a PSM result
+  file for an input made with `make_synthetic_pin.py --mark-correct`, which
+  marks correct and incorrect targets in the PSM ids.
 
 Per-stage wall clock and CPU times are printed to stderr with `-v 3`
 (lines starting with `Stage`).

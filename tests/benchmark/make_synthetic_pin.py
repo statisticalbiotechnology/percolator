@@ -50,6 +50,9 @@ def main():
                     help="fraction of target PSMs that are correct")
     ap.add_argument("--seed", type=int, default=1)
     ap.add_argument("--decoy-prefix", default="decoy_")
+    ap.add_argument("--mark-correct", action="store_true",
+                    help="mark correct and incorrect targets in SpecId (target_c_..., "
+                         "target_i_...) for checking PEP and q-value calibration")
     ap.add_argument("-o", "--output", default="-")
     args = ap.parse_args()
 
@@ -86,7 +89,10 @@ def main():
         num_prots = rng.choice((1, 1, 1, 2, 3))
         proteins = [prots[zipf_index(rng, len(prots))] for _ in range(num_prots)]
         label = "-1" if is_decoy else "1"
-        spec_id = "%s_%d_%d_%s" % ("decoy" if is_decoy else "target", scan, charge, label)
+        kind = "decoy" if is_decoy else "target"
+        if args.mark_correct and not is_decoy:
+            kind += "_c" if correct else "_i"
+        spec_id = "%s_%d_%d_%s" % (kind, scan, charge, label)
         out.write("\t".join([spec_id, label, str(scan), "%.4f" % exp_mass] + feats + [peptide] + proteins) + "\n")
 
     scan = 0
