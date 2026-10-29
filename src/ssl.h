@@ -80,6 +80,12 @@ inline bool operator<(const Delta& a, const Delta& b) {
   return (a.delta < b.delta);
 }
 
+struct SolverWorkspace {
+  SolverWorkspace(int m, int n);
+  std::vector<double> set2, z, q, r, p;
+  std::vector<Delta> deltas;
+};
+
 /* svmlin algorithms and their subroutines */
 
 /* Conjugate Gradient for Sparse Linear Least Squares Problems */
@@ -88,7 +94,7 @@ inline bool operator<(const Delta& a, const Delta& b) {
 int CGLS(const AlgIn& set, const double lambda, const int cgitermax,
          const double epsilon, const vector_int& Subset,
          vector_double& Weights, vector_double& Outputs,
-         double cpos, double cneg);
+         double cpos, double cneg, SolverWorkspace& workspace);
 
 /* Linear Modified Finite Newton L2-SVM*/
 /* Solves: min_w 0.5*Options->lamda*w'*w + 0.5*sum_i Data->C[i] max(0,1 - Y[i] w' x_i)^2 */
@@ -97,5 +103,5 @@ int L2_SVM_MFN(const AlgIn& set, options& Options,
                vector_double& Outputs, double cpos, double cneg);
 double line_search(double* w, double* w_bar, double lambda, double* o,
                          double* o_bar, const double* Y, int d, int l,
-                          double cpos, double cneg);
+                          double cpos, double cneg, Delta* deltas);
 #endif

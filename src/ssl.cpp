@@ -27,16 +27,9 @@ using namespace std;
 #include "Timer.h"
 
 extern "C" {
-  extern double dnrm2_(int *, double *, int *); // Return the Euclidian norm of a vector
   extern double ddot_(int *, double *, int *, double *, int *); // compute the dot product of two vectors
   extern int daxpy_(int *, double *, double *, int *, double *, int *); // compute y := alpha * x + y
   extern int dscal_(int *, double *, double *, int *); // Compute y := alpha * y
-  // dgemv - perform one of the matrix-vector operations, y  :=
-  // alpha*A*x + beta*y or y := alpha*A'*x + beta*y
-  extern int dgemv_(char *, int *, int *,
-                    double *, double *, int *,
-                    double *, int *,  double *,
-                    double *, int *);
 }
 
 #define VERBOSE 1
@@ -55,19 +48,57 @@ AlgIn::~AlgIn() {
   delete[] Y;
 }
 
+/* Buffers of one L2_SVM_MFN solve, sized for all m examples and reused by
+   all its CGLS calls and line searches. */
+SolverWorkspace::SolverWorkspace(int m, int n)
+    : set2(static_cast<size_t>(m) * static_cast<size_t>(n)),
+      z(static_cast<size_t>(m)), q(static_cast<size_t>(m)),
+      r(static_cast<size_t>(n)), p(static_cast<size_t>(n)),
+      deltas(static_cast<size_t>(m)) {}
+
+/* q = set2 * p for the active rows of set2 (row length n). Gives the same
+   result as the reference BLAS dgemv with trans='T', alpha=1 and beta=0,
+   which this replaces: every row is summed in the same order, but four rows
+   are processed together so that their additions overlap instead of waiting
+   on each other. */
+static void activeRowsTimesVector(int active, const double* set2, int n,
+                                  const double* p, double* q) {
+  int i = 0;
+  for (; i + 4 <= active; i += 4) {
+    const double* x0 = set2 + static_cast<size_t>(i) * static_cast<size_t>(n);
+    const double* x1 = x0 + n;
+    const double* x2 = x1 + n;
+    const double* x3 = x2 + n;
+    double t0 = 0.0, t1 = 0.0, t2 = 0.0, t3 = 0.0;
+    for (int k = 0; k < n; k++) {
+      t0 += x0[k] * p[k];
+      t1 += x1[k] * p[k];
+      t2 += x2[k] * p[k];
+      t3 += x3[k] * p[k];
+    }
+    // dgemv adds the dot product to the zeroed output vector
+    q[i] = 0.0 + t0;
+    q[i + 1] = 0.0 + t1;
+    q[i + 2] = 0.0 + t2;
+    q[i + 3] = 0.0 + t3;
+  }
+  for (; i < active; i++) {
+    const double* x = set2 + static_cast<size_t>(i) * static_cast<size_t>(n);
+    double t = 0.0;
+    for (int k = 0; k < n; k++) {
+      t += x[k] * p[k];
+    }
+    q[i] = 0.0 + t;
+  }
+}
+
 double cglsFun1(int active, int* J, const double* Y,
                 double* set2, int n, double* q, 
                 double* p, double cpos, double cneg){
   double omega_q = 0.0;
-  int inc = 1;
   int i = 0;
 
-  char trans = 'T';
-  double alpha = 1.0;
-  double beta = 0.0;
-  dgemv_(&trans, &n, &active,
-         &alpha, set2, &n,
-         p, &inc, &beta, q, &inc);
+  activeRowsTimesVector(active, set2, n, p, q);
 
   for (i = 0; i < active; i++) {
     omega_q += ((Y[J[i]]==1)? cpos : cneg) * (q[i]) * (q[i]);
@@ -86,14 +117,16 @@ void cglsFun2(int active, int* J, const double* Y,
   for (i = 0; i < active; i++) {
     o[J[i]] += q[i];
     z[i] -= ((Y[J[i]]==1)? cpos : cneg) * q[i];
-    daxpy_(&n, &(z[i]), set2 + i * n, &inc, r, &inc);
+    daxpy_(&n, &(z[i]),
+           set2 + static_cast<size_t>(i) * static_cast<size_t>(n), &inc, r,
+           &inc);
   }
 }
 
 int CGLS(const AlgIn& data, const double lambda, const int cgitermax,
          const double epsilon, const vector_int& Subset,
          vector_double& Weights, vector_double& Outputs,
-         double cpos, double cneg) {
+         double cpos, double cneg, SolverWorkspace& workspace) {
   if (VERBOSE_CGLS) {
     cout << "CGLS starting..." << endl;
   }
@@ -107,29 +140,30 @@ int CGLS(const AlgIn& data, const double lambda, const int cgitermax,
   double* beta = Weights.vec;
   double* o = Outputs.vec;
   // initialize z
-  double* z = new double[active];
-  double* q = new double[active];
+  double* z = workspace.z.data();
+  double* q = workspace.q.data();
   int ii = 0;
   int i;
   int n0 = n-1;
   int inc = 1;
   double one = 1;
   double negLambda = -lambda;
-  int rowStart = 0;
-  double* set2 = new double[n*active];
-  double* r = new double[n];
+  size_t rowStart = 0;
+  // contiguous copy of the active rows, with the intercept as last column
+  double* set2 = workspace.set2.data();
+  double* r = workspace.r.data();
   for (i = n; i--;) {
     r[i] = 0.0;
   }
   for (i = 0; i < active; i++) {
     ii = J[i];
     z[i] = ((Y[ii]==1)? cpos : cneg) * (Y[ii] - o[ii]);
-    rowStart = i * n;
+    rowStart = static_cast<size_t>(i) * static_cast<size_t>(n);
     memcpy(set2 + rowStart, set[ii], sizeof(double)*static_cast<std::size_t>(n0));
     set2[rowStart + n0] = 1.0;
-    daxpy_(&n, &(z[i]), set2 + i*n, &inc, r, &inc);
+    daxpy_(&n, &(z[i]), set2 + rowStart, &inc, r, &inc);
   }
-  double* p = new double[n];
+  double* p = workspace.p.data();
   daxpy_(&n, &negLambda, beta, &inc, r, &inc);
   memcpy(p, r, sizeof(double)*static_cast<std::size_t>(n));
   double omega1 = ddot_(&n, r, &inc, r, &inc);
@@ -183,11 +217,6 @@ int CGLS(const AlgIn& data, const double lambda, const int cgitermax,
     cerr << "CGLS converged in " << cgiter << " iteration(s) and "
         << tictoc.getCPUTimeStr() << " CPU seconds." << endl;
   }
-  delete[] z;
-  delete[] q;
-  delete[] r;
-  delete[] p;
-  delete[] set2;
   return optimality;
 }
 
@@ -244,6 +273,7 @@ int L2_SVM_MFN(const AlgIn& data, options& Options,
   Outputs_bar.d = m;
   double delta = 0.0;
   int ii = 0;
+  SolverWorkspace workspace(m, n);
   while (iter < Options.mfnitermax) {
     iter++;
     if (VERB > 4) {
@@ -259,7 +289,7 @@ int L2_SVM_MFN(const AlgIn& data, options& Options,
                epsilon,
                ActiveSubset,
                Weights_bar,
-               Outputs_bar, cpos, cneg);
+               Outputs_bar, cpos, cneg, workspace);
     for (int i = active; i < m; i++) {
       ii = ActiveSubset.vec[i];
       o_bar[ii] = ddot_(&n0, set[ii], &inc, w_bar, &inc) + w_bar[n - 1];
@@ -301,7 +331,8 @@ int L2_SVM_MFN(const AlgIn& data, options& Options,
         return 1;
       }
     }
-    delta = line_search(w, w_bar, lambda, o, o_bar, Y, n, m, cpos, cneg);
+    delta = line_search(w, w_bar, lambda, o, o_bar, Y, n, m, cpos, cneg,
+                        workspace.deltas.data());
     F_old = F;
     double delta2 = 1-delta;
     dscal_(&n, &delta2, w, &inc);
@@ -331,7 +362,7 @@ int L2_SVM_MFN(const AlgIn& data, options& Options,
 
 double line_search(double* w, double* w_bar, double lambda, double* o,
                    double* o_bar, const double* Y, int d, /* data dimensionality -- 'n' */
-                   int l, double cpos, double cneg){
+                   int l, double cpos, double cneg, Delta* deltas){
   int i = 0;
   double omegaL = 0.0;
   double omegaR = 0.0;
@@ -348,7 +379,6 @@ double line_search(double* w, double* w_bar, double lambda, double* o,
   int ii = 0;
   double d2 = 0.0;
 
-  Delta* deltas = new Delta[l];
   int p = 0;
   for (i = 0; i < l; i++) {
     diff = Y[i] * (o_bar[i] - o[i]);
@@ -383,7 +413,6 @@ double line_search(double* w, double* w_bar, double lambda, double* o,
     L += diff * (o[ii] - Y[ii]);
     R += diff * (o_bar[ii] - Y[ii]);
   }
-  delete[] deltas;
   return (-L / (R - L));
 }
 
