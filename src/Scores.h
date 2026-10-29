@@ -139,8 +139,9 @@ class Scores {
     nullTargetWinProb_ = nullTargetWinProb;
   }
 
+  // removes all PSMs and releases their memory
   void reset() {
-    scores_.clear();
+    std::vector<ScoreHolder>().swap(scores_);
     totalNumberOfTargets_ = 0;
     totalNumberOfDecoys_ = 0;
   }

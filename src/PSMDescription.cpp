@@ -23,21 +23,12 @@
 #include "Globals.h"
 
 
-PSMDescription::PSMDescription() : features(NULL), expMass(0.), calcMass(0.), retentionTime_(nan("")), scan(0u), specFileNr(0u), id_(""), peptide("") {
-}
-
-PSMDescription::PSMDescription(const std::string& pep) : features(NULL), expMass(0.), calcMass(0.), retentionTime_(nan("")), scan(0u), specFileNr(0u), id_(""), peptide(pep) {
-}
-
-PSMDescription::~PSMDescription() {}
-
 std::string PSMDescription::proteinNameSeparator_ = "\t";
 std::vector<string> PSMDescription::spectraFileNames_(0);
 size_t PSMDescription::lastSpectrumFileIndex_ = 0;
 
 void PSMDescription::deletePtr(PSMDescription* psm) {
     if (psm != NULL) {
-        psm->deleteRetentionFeatures();
         delete psm;
         psm = NULL;
     }

@@ -16,6 +16,7 @@
  *******************************************************************************/
 #ifndef PSMDESCRIPTION_H_
 #define PSMDESCRIPTION_H_
+#include <cmath>
 #include <iostream>
 #include <map>
 #include <string>
@@ -33,15 +34,10 @@
  */
 class PSMDescription {
    public:
-    PSMDescription();
-    PSMDescription(const std::string& peptide);
+    PSMDescription() = default;
+    PSMDescription(const std::string& peptide) : peptide(peptide) {}
 
-    virtual ~PSMDescription();
     static void deletePtr(PSMDescription* psm);
-    virtual void deleteRetentionFeatures() {}
-
-    void clear() { proteinIds.clear(); }
-    double* getFeatures() { return features; }
 
     // TODO: move these static functions somewhere else
     static std::string removePTMs(const std::string& peptideSeq);
@@ -81,13 +77,6 @@ class PSMDescription {
 
     std::string& getFullPeptide() { return peptide; }
     void setPeptide(std::string pep_seq) { peptide = std::move(pep_seq); }
-    PSMDescription* getAParent() { return this; }
-    void checkFragmentPeptides(
-        std::vector<PSMDescription*>::reverse_iterator other,
-        std::vector<PSMDescription*>::reverse_iterator theEnd) {
-        (void)other;
-        (void)theEnd;
-    }
     static inline void setProteinNameSeparator(const std::string sep) {
         proteinNameSeparator_ = sep;
     }
@@ -116,21 +105,16 @@ class PSMDescription {
     }
     inline bool static hasSpectrumFileName() { return !spectraFileNames_.empty(); }
 
-    void setRetentionFeatures(double* retentionFeatures) {(void) retentionFeatures; }
-    double* getRetentionFeatures() { return NULL; }
-
-    void setParentFragment(PSMDescription*) {}
-    PSMDescription* getParentFragment() { return NULL; }
-
     inline void setRetentionTime(const double retentionTime) {
         retentionTime_ = retentionTime;
     }
     inline double getRetentionTime() const { return retentionTime_; }
 
-    double* features;  // owned by a FeatureMemoryPool instance, no need to delete
-    double expMass, calcMass, retentionTime_;
-    unsigned int scan;
-    unsigned int specFileNr;
+    double* features = NULL;  // owned by a FeatureMemoryPool instance, no need to delete
+    double expMass = 0.0, calcMass = 0.0;
+    double retentionTime_ = std::nan("");
+    unsigned int scan = 0u;
+    unsigned int specFileNr = 0u;
     std::vector<std::string> proteinIds;
 
    protected:

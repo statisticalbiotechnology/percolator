@@ -107,6 +107,9 @@ int CrossValidation::preIterationSetup(Scores& fullset,
 
   initializeGridSearch(fullset.getTargetDecoySizeRatio());
 
+  // the folds hold copies of all PSMs; postIterationProcessing merges them
+  // back into fullset
+  fullset.reset();
   return numPositive;
 }
 

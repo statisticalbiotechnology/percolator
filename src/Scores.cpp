@@ -46,6 +46,11 @@ void Scores::merge(std::vector<Scores>& sv,
                    bool skipNormalizeScores,
                    std::vector<std::vector<double> >& all_w) {
   scores_.clear();
+  size_t numScores = 0;
+  for (const Scores& binScores : sv) {
+    numScores += binScores.scores_.size();
+  }
+  scores_.reserve(numScores);
   std::vector<Scores>::iterator cvBinScores = sv.begin();
   std::vector<std::vector<double> >::iterator weights = all_w.begin();
   for (; cvBinScores != sv.end(); cvBinScores++, weights++) {
@@ -94,7 +99,6 @@ void Scores::scoreAndAddPSM(ScoreHolder& sh,
 
   featurePool.deallocate(sh.pPSM->features);
   sh.pPSM->features = NULL;
-  sh.pPSM->deleteRetentionFeatures();
 
   if (sh.isTarget()) {
     ++totalNumberOfTargets_;

@@ -1161,8 +1161,9 @@ int Caller::run() {
     if (VERB > 0) {
       cerr << "Scoring full list of PSMs with trained SVMs." << endl;
     }
-    setHandler.reset();
     allScores.reset();
+    allScores.reserve(setHandler.getNumPsmLines());
+    setHandler.reset();
 
     fileStream.clear();
     fileStream.seekg(0, ios::beg);

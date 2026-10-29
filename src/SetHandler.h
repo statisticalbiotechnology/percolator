@@ -84,6 +84,8 @@ class SetHandler {
      
   //const double* getFeatures(const int setPos, const int ixPos) const; 
   size_t getMaxPSMs() { return maxPSMs_; }
+  // number of PSM lines in the input, counted by the last full read
+  size_t getNumPsmLines() const { return numPsmLines_; }
   
   // Reads in tab delimited stream and returns a SanityCheck object based on
   // the presence of default weights. Returns 0 on error, 1 on success.
@@ -114,6 +116,7 @@ class SetHandler {
 
  protected:
   size_t maxPSMs_;
+  size_t numPsmLines_ = 0;
   std::vector<std::unique_ptr<DataSet> > subsets_;
   FeatureMemoryPool featurePool_;
   std::string decoyPrefix_; // Used to determine if a psm is a decoy

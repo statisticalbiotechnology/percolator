@@ -305,8 +305,9 @@ void SetHandler::readPSMs(istream& dataStream, std::string& psmLine,
     } while (getline(dataStream, psmLine));
   }
   
+  numPsmLines_ = lineNr - (hasInitialValueRow ? 3u : 2u);
   if (VERB > 1) {
-    std::cerr << "Found " << lineNr - (hasInitialValueRow ? 3u : 2u) << " PSMs" << std::endl;
+    std::cerr << "Found " << numPsmLines_ << " PSMs" << std::endl;
   }
   
   push_back_dataset(std::move(targetSet));
