@@ -42,7 +42,7 @@ std::string Timer::getTimeStr(double time, int numDecimals)
     return timeStr.str();
 }
 
-char* Timer::getStartTimeStr(){
+std::string Timer::getStartTimeStr(){
     return ctime(&wallStartTime);
 }
 

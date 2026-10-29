@@ -186,7 +186,7 @@ void BaseSpline::initiateQR() {
   }
   R[n - 3].packedAddElement(n - 3, (dx[n - 3] + dx[n - 2]) / 3);
   Qt = PackedMatrix(n-2,n);
-  Qt = Qt.packedTranspose(Q);
+  Qt = PackedMatrix::packedTranspose(Q);
 }
 
 double BaseSpline::evaluateSlope(double alpha) {

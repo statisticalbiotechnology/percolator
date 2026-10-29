@@ -71,7 +71,7 @@ class TabReader {
     char* next = NULL;
     errno = 0;
     double d = strtod(f_, &next);
-    if (next == f_ || (*next != '\0' && !isspace(*next))
+    if (next == f_ || (*next != '\0' && !isspace(static_cast<unsigned char>(*next)))
                    || ((d == HUGE_VAL || d == -HUGE_VAL) && errno == ERANGE)) {
       err = errno ? errno : 1;
     }
@@ -83,7 +83,7 @@ class TabReader {
     char* next = NULL;
     errno=0;
     long val = strtol(f_, &next, 10);
-    if (next == f_ || (*next != '\0' && !isspace(*next))
+    if (next == f_ || (*next != '\0' && !isspace(static_cast<unsigned char>(*next)))
                    || val < INT_MIN || val > INT_MAX) {
       err = errno ? errno : 1;
     }

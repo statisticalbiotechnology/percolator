@@ -1006,6 +1006,7 @@ bool Caller::loadAndNormalizeData(std::istream& dataStream,
  */
 int Caller::run() {
   timer.reset();
+  PSMDescription::resetSpectrumFileNames();
 
   if (VERB > 0) {
     std::cerr << extendedGreeter();

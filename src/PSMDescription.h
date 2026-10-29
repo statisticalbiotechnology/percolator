@@ -95,7 +95,7 @@ class PSMDescription {
 
     void setSpectrumFileName(const std::string& fileName) {
         // consecutive PSMs usually come from the same file
-        static size_t lastIndex = 0;
+        size_t& lastIndex = lastSpectrumFileIndex_;
         if (lastIndex >= spectraFileNames_.size() || spectraFileNames_[lastIndex] != fileName) {
             auto specFilePos = std::find(spectraFileNames_.begin(), spectraFileNames_.end(), fileName);
             lastIndex = specFilePos - spectraFileNames_.begin();
@@ -104,6 +104,11 @@ class PSMDescription {
             }
         }
         specFileNr = static_cast<unsigned int>(lastIndex);
+    }
+    // forgets the spectrum file names of an earlier run in the same process
+    static void resetSpectrumFileNames() {
+        spectraFileNames_.clear();
+        lastSpectrumFileIndex_ = 0;
     }
     inline const std::string& getSpectrumFileName() {
         static const std::string noFileName;
@@ -133,6 +138,7 @@ class PSMDescription {
     std::string peptide;
     static std::string proteinNameSeparator_;
     static vector<std::string> spectraFileNames_;
+    static size_t lastSpectrumFileIndex_;
 };
 
 inline std::ostream& operator<<(std::ostream& out, PSMDescription& psm) {

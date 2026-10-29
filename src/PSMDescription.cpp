@@ -33,6 +33,7 @@ PSMDescription::~PSMDescription() {}
 
 std::string PSMDescription::proteinNameSeparator_ = "\t";
 std::vector<string> PSMDescription::spectraFileNames_(0);
+size_t PSMDescription::lastSpectrumFileIndex_ = 0;
 
 void PSMDescription::deletePtr(PSMDescription* psm) {
     if (psm != NULL) {

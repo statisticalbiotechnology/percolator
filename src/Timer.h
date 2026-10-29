@@ -17,7 +17,7 @@ public:
 
     std::string getCPUTimeStr();
     std::string getWallTimeStr();
-    char* getStartTimeStr();
+    std::string getStartTimeStr();
 
 private:
     time_t wallEndTime, wallStartTime;
