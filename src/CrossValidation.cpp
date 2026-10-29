@@ -148,18 +148,20 @@ void CrossValidation::initializeGridSearch(double targetDecoySizeRatio) {
     }
   }
 
+  // Quick validation trains only Cpos = Cneg = 1. The candidate lists are
+  // replaced as well, since the selection after nested cross validation
+  // loops over them and would otherwise pick a pair that was never trained.
+  if (quickValidation_) {
+    candidatesCpos_.assign(1, 1.0);
+    candidatesCfrac_.assign(1, 1.0);
+  }
+
   // Form cpos, cneg pairs per nested CV fold
   CandidateCposCfrac cpCnFold;
   for (unsigned int set = 0; set < numFolds_; ++set) {
     for (int nestedSet = 0; nestedSet < nestedXvalBins_; nestedSet++) {
-      std::vector<double> candidatesCpos = candidatesCpos_;
-      std::vector<double> candidatesCfrac = candidatesCfrac_;
-      if (quickValidation_) {  // in quick validation,
-        candidatesCpos = std::vector<double>(1, 1);
-        candidatesCfrac = std::vector<double>(1, 1);
-      }
-      for (double cpos : candidatesCpos) {
-        for (double cfrac : candidatesCfrac) {
+      for (double cpos : candidatesCpos_) {
+        for (double cfrac : candidatesCfrac_) {
           cpCnFold.cpos = cpos;
           cpCnFold.cfrac = cfrac;
           cpCnFold.set = set;
