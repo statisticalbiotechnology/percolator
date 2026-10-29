@@ -379,11 +379,23 @@ void CrossValidation::trainCpCnPair(CandidateCposCfrac& cpCnFold,
   if (VERB > 3)
     cerr << "- cross-validation with Cpos=" << cpos << ", Cneg=" << cfrac * cpos
          << endl;
-  // the SVM algorithm (see ssl.cpp) starts from zero weights and outputs
-  std::fill(cpCnFold.ww.begin(), cpCnFold.ww.end(), 0.0);
+  // The SVM algorithm (see ssl.cpp) starts from the weights this pair had
+  // after the previous iteration (zero in the first one), which are close
+  // to the new solution, or from zero with classic training.
+  std::vector<double>& weights = cpCnFold.ww;
   std::vector<double> outputs(
       static_cast<std::size_t>(svmInput.positives + svmInput.negatives), 0.0);
-  L2_SVM_MFN(svmInput, pOptions, cpCnFold.ww, outputs, cpos, cfrac * cpos);
+  if (classicTraining_) {
+    std::fill(weights.begin(), weights.end(), 0.0);
+  } else {
+    for (int i = 0; i < svmInput.m; ++i) {
+      const double* x = svmInput.row(i);
+      double o = 0.0;
+      for (int k = 0; k < svmInput.n; ++k) o += x[k] * weights[k];
+      outputs[i] = o;
+    }
+  }
+  L2_SVM_MFN(svmInput, pOptions, weights, outputs, cpos, cfrac * cpos);
 }
 
 /**

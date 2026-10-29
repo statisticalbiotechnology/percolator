@@ -165,6 +165,11 @@ bool Caller::parseOptions(int argc, char** argv) {
   cmd.defineOption("x", "quick-validation",
                    "Quicker execution by reduced internal cross-validation.",
                    "", TRUE_IF_SET);
+  cmd.defineOption("", "classic-training",
+                   "Train the SVMs as Percolator 3.09 did: every SVM is "
+                   "solved from zero weights, which takes longer but "
+                   "reproduces earlier results.",
+                   "", TRUE_IF_SET);
   cmd.defineOption("J", "tab-out",
                    "Output computed features to the specified file in "
                    "tab-delimited PIN format.",
@@ -545,6 +550,9 @@ bool Caller::parseOptions(int argc, char** argv) {
   }
   if (cmd.isOptionSet("quick-validation")) {
     quickValidation_ = true;
+  }
+  if (cmd.isOptionSet("classic-training")) {
+    classicTraining_ = true;
   }
   if (cmd.isOptionSet("train-best-positive")) {
     trainBestPositive_ = true;
@@ -1112,6 +1120,7 @@ int Caller::run() {
         initialSelectionFdr_, selectedCpos_, selectedCneg_, numIterations_,
         useMixMax_, nestedXvalBins_, trainBestPositive_, numThreads_,
         skipNormalizeScores_, decoyFractionTraining, numFolds);
+    crossValidation.setClassicTraining(classicTraining_);
 
     int firstNumberOfPositives =
         crossValidation.preIterationSetup(allScores, check_, pNorm_.get());

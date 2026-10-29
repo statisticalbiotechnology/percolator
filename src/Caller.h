@@ -95,6 +95,7 @@ class Caller {
   double selectionFdr_, initialSelectionFdr_, testFdr_;
   unsigned int numIterations_, maxPSMs_, nestedXvalBins_, numThreads_;
   double selectedCpos_, selectedCneg_;
+  bool classicTraining_ = false;
   bool reportEachIteration_, quickValidation_, trainBestPositive_,
       skipNormalizeScores_, analytics_, useResetAlgorithm_,
       useCompositionMatch_, useIrlsPep_, useInterpolatingPep_, usePavaPep_;

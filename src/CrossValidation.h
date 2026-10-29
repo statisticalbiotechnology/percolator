@@ -84,6 +84,8 @@ class CrossValidation {
   void inline setReportPerformanceEachIteration(bool on) {
     reportPerformanceEachIteration_ = on;
   }
+  // train as Percolator 3.09 did, see Caller's --classic-training
+  void inline setClassicTraining(bool on) { classicTraining_ = on; }
 
  protected:
   std::vector<AlgIn> svmInputs_;
@@ -93,6 +95,7 @@ class CrossValidation {
                              // fold
 
   bool quickValidation_;
+  bool classicTraining_ = false;
   bool usePi0_;
   bool reportPerformanceEachIteration_;
 
