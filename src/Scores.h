@@ -82,9 +82,15 @@ class Scores {
                          bool skipDecoysPlusOne = false);
   int calcScores(vector<double>& w);
   int calcQvals(double fdr, bool skipDecoysPlusOne = false);
-  int countTargetsBelowFdr(const std::vector<double>& w, double fdr,
-                           bool skipDecoysPlusOne,
-                           std::vector<std::pair<double, bool> >& combined) const;
+  // feature rows and labels of the PSMs, see getFeatureRows
+  typedef std::vector<std::pair<const double*, bool> > FeatureRows;
+  void getFeatureRows(FeatureRows& rows) const;
+  int countTargetsBelowFdr(
+      const FeatureRows& rows,
+      const std::vector<double>& w,
+      double fdr,
+      bool skipDecoysPlusOne,
+      std::vector<std::pair<double, bool> >& combined) const;
   void calcPep(const bool spline = false, const bool interpol = true, const bool from_q = false);
  
   void populateWithPSMs(SetHandler& setHandler);

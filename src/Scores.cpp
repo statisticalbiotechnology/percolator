@@ -408,7 +408,8 @@ int Scores::calcScoresAndQvals(std::vector<double>& w,
 int Scores::calcScores(std::vector<double>& w) {
   std::size_t ix;
   const long numScores = static_cast<long>(scores_.size());
-#pragma omp parallel for schedule(static) if (numScores > 100000 && !omp_in_parallel())
+#pragma omp parallel for schedule(static) \
+    if (numScores > 100000 && !omp_in_parallel())
   for (long i = 0; i < numScores; ++i) {
     scores_[i].score = calcScore(scores_[i].pPSM->features, w);
   }
@@ -498,20 +499,64 @@ int Scores::countTargetsBelowFdr(
 }
 
 /**
+ * Lists the feature rows and labels of the PSMs ordered by memory address,
+ * so that scoring them streams through the feature storage instead of
+ * following a pointer per PSM to scattered memory.
+ */
+void Scores::getFeatureRows(FeatureRows& rows) const {
+  rows.resize(scores_.size());
+  for (std::size_t ix = 0; ix < scores_.size(); ++ix) {
+    rows[ix] = FeatureRows::value_type(scores_[ix].pPSM->features,
+                                       scores_[ix].isTarget());
+  }
+  std::sort(rows.begin(), rows.end(),
+            [](const FeatureRows::value_type& a,
+               const FeatureRows::value_type& b) {
+              return std::less<const double*>()(a.first, b.first);
+            });
+}
+
+/**
  * Returns the number of targets that calcScoresAndQvals(w, fdr,
  * skipDecoysPlusOne) would report, without changing this object, so that it
  * can be used concurrently. Only scores and labels are sorted, which is much
  * cheaper than sorting the ScoreHolders.
+ * @param rows the PSMs of this set, from getFeatureRows
  * @param combined buffer for the (score, isTarget) pairs
  */
-int Scores::countTargetsBelowFdr(const std::vector<double>& w,
-                                 double fdr,
-                                 bool skipDecoysPlusOne,
-                                 std::vector<pair<double, bool> >& combined) const {
-  combined.resize(scores_.size());
-  for (std::size_t ix = 0; ix < scores_.size(); ++ix) {
-    combined[ix] = pair<double, bool>(calcScore(scores_[ix].pPSM->features, w),
-                                      scores_[ix].isTarget());
+int Scores::countTargetsBelowFdr(
+    const FeatureRows& rows,
+    const std::vector<double>& w,
+    double fdr,
+    bool skipDecoysPlusOne,
+    std::vector<pair<double, bool> >& combined) const {
+  // same summation order as calcScore, four rows at a time so that their
+  // additions overlap
+  const std::size_t numFeatures = FeatureNames::getNumFeatures();
+  const std::size_t numRows = rows.size();
+  combined.resize(numRows);
+  std::size_t i = 0;
+  for (; i + 4 <= numRows; i += 4) {
+    const double* f0 = rows[i].first;
+    const double* f1 = rows[i + 1].first;
+    const double* f2 = rows[i + 2].first;
+    const double* f3 = rows[i + 3].first;
+    double s0 = w[numFeatures], s1 = w[numFeatures], s2 = w[numFeatures],
+           s3 = w[numFeatures];
+    for (std::size_t ix = numFeatures; ix--;) {
+      s0 += f0[ix] * w[ix];
+      s1 += f1[ix] * w[ix];
+      s2 += f2[ix] * w[ix];
+      s3 += f3[ix] * w[ix];
+    }
+    combined[i] = pair<double, bool>(s0, rows[i].second);
+    combined[i + 1] = pair<double, bool>(s1, rows[i + 1].second);
+    combined[i + 2] = pair<double, bool>(s2, rows[i + 2].second);
+    combined[i + 3] = pair<double, bool>(s3, rows[i + 3].second);
+  }
+  for (; i < numRows; ++i) {
+    combined[i] =
+        pair<double, bool>(calcScore(rows[i].first, w), rows[i].second);
   }
   std::sort(combined.begin(), combined.end(),
             [](const pair<double, bool>& a, const pair<double, bool>& b) {
@@ -520,25 +565,28 @@ int Scores::countTargetsBelowFdr(const std::vector<double>& w,
   return countTargetsBelowFdr(combined, fdr, skipDecoysPlusOne);
 }
 
+/**
+ * Starts a new training set in data with the decoys, in the order of this
+ * set. generatePositiveTrainingSet then appends the positives.
+ */
 void Scores::generateNegativeTrainingSet(AlgIn& data, const double cneg) {
-  std::size_t ix2 = 0;
+  data.clear();
+  // room for the largest possible training set; only touched when used
+  data.rows.reserve(scores_.size() * static_cast<size_t>(data.n));
+  data.Y.reserve(scores_.size());
   std::vector<ScoreHolder>::const_iterator scoreIt = scores_.begin();
   for (; scoreIt != scores_.end(); ++scoreIt) {
     if (scoreIt->isDecoy()) {
-      data.vals[ix2] = scoreIt->pPSM->features;
-      data.Y[ix2] = -1;
-      // data.C[ix2] = cneg;
-      ix2++;
+      data.add(scoreIt->pPSM->features, -1);
     }
   }
-  data.negatives = static_cast<int>(ix2);
+  data.negatives = data.m;
 }
 
 void Scores::generatePositiveTrainingSet(AlgIn& data,
                                          const double fdr,
                                          const double cpos,
                                          const bool trainBestPositive) {
-  std::size_t ix2 = static_cast<std::size_t>(data.negatives);
   int p = 0;
 
   std::vector<ScoreHolder>::iterator lastUniqueIt = scores_.end();
@@ -553,16 +601,12 @@ void Scores::generatePositiveTrainingSet(AlgIn& data,
   for (; scoreIt != lastUniqueIt; ++scoreIt) {
     if (scoreIt->isTarget()) {
       if (scoreIt->q <= fdr) {
-        data.vals[ix2] = scoreIt->pPSM->features;
-        data.Y[ix2] = 1;
-        // data.C[ix2] = cpos;
-        ix2++;
+        data.add(scoreIt->pPSM->features, 1);
         ++p;
       }
     }
   }
   data.positives = p;
-  data.m = static_cast<int>(ix2);
 }
 
 void Scores::weedOutRedundant() {

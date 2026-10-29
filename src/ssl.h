@@ -26,16 +26,35 @@ using namespace std;
 
 #define VERBOSE_CGLS 0
 
+/* Training examples of the SVM. The feature rows are copied into one
+   contiguous row-major matrix, with the intercept (1.0) as the last column,
+   so that the solver streams through memory instead of following pointers
+   to scattered rows. */
 class AlgIn {
   public:
-    AlgIn(const unsigned int size, const int numFeat);
-    virtual ~AlgIn();
-    int m; /* number of examples */
-    int n; /* number of features */
-    int positives;
-    int negatives;
-    double** vals;
-    double* Y; /* labels */
+    explicit AlgIn(const int numFeat) : n(numFeat) {}
+    int m = 0; /* number of examples */
+    int n; /* number of features, including the intercept */
+    int positives = 0;
+    int negatives = 0;
+    std::vector<double> rows; /* m x n */
+    std::vector<double> Y; /* labels */
+
+    const double* row(int i) const {
+      return rows.data() + static_cast<size_t>(i) * static_cast<size_t>(n);
+    }
+    void clear() {
+      m = positives = negatives = 0;
+      rows.clear();
+      Y.clear();
+    }
+    /* appends an example with n-1 features */
+    void add(const double* features, double label) {
+      rows.insert(rows.end(), features, features + (n - 1));
+      rows.push_back(1.0);
+      Y.push_back(label);
+      ++m;
+    }
 };
 
 struct vector_double { /* defines a vector of doubles */
@@ -82,7 +101,7 @@ inline bool operator<(const Delta& a, const Delta& b) {
 
 struct SolverWorkspace {
   SolverWorkspace(int m, int n);
-  std::vector<double> set2, z, q, r, p;
+  std::vector<double> z, q, r, p;
   std::vector<Delta> deltas;
 };
 

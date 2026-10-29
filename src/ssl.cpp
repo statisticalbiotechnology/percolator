@@ -36,39 +36,27 @@ extern "C" {
 #define LOG2(x) 1.4426950408889634*log(x)
 // for compatibility issues, not using log2
 
-AlgIn::AlgIn(const unsigned int size, const int numFeat) {
-  vals = new double*[size];
-  Y = new double[size];
-  n = numFeat;
-  positives = 0;
-  negatives = 0;
-}
-AlgIn::~AlgIn() {
-  delete[] vals;
-  delete[] Y;
-}
-
 /* Buffers of one L2_SVM_MFN solve, sized for all m examples and reused by
    all its CGLS calls and line searches. */
 SolverWorkspace::SolverWorkspace(int m, int n)
-    : set2(static_cast<size_t>(m) * static_cast<size_t>(n)),
-      z(static_cast<size_t>(m)), q(static_cast<size_t>(m)),
+    : z(static_cast<size_t>(m)), q(static_cast<size_t>(m)),
       r(static_cast<size_t>(n)), p(static_cast<size_t>(n)),
       deltas(static_cast<size_t>(m)) {}
 
-/* q = set2 * p for the active rows of set2 (row length n). Gives the same
-   result as the reference BLAS dgemv with trans='T', alpha=1 and beta=0,
-   which this replaces: every row is summed in the same order, but four rows
-   are processed together so that their additions overlap instead of waiting
-   on each other. */
-static void activeRowsTimesVector(int active, const double* set2, int n,
+/* q[i] = x_{J[i]}' p for the active rows (length n, intercept included).
+   Gives the same result as the reference BLAS dgemv with trans='T', alpha=1
+   and beta=0 on a copy of the active rows, which this replaces: every row is
+   summed in the same order, but four rows are processed together so that
+   their additions overlap instead of waiting on each other. */
+static void activeRowsTimesVector(int active, const int* J, const AlgIn& data,
                                   const double* p, double* q) {
+  const int n = data.n;
   int i = 0;
   for (; i + 4 <= active; i += 4) {
-    const double* x0 = set2 + static_cast<size_t>(i) * static_cast<size_t>(n);
-    const double* x1 = x0 + n;
-    const double* x2 = x1 + n;
-    const double* x3 = x2 + n;
+    const double* x0 = data.row(J[i]);
+    const double* x1 = data.row(J[i + 1]);
+    const double* x2 = data.row(J[i + 2]);
+    const double* x3 = data.row(J[i + 3]);
     double t0 = 0.0, t1 = 0.0, t2 = 0.0, t3 = 0.0;
     for (int k = 0; k < n; k++) {
       t0 += x0[k] * p[k];
@@ -83,7 +71,7 @@ static void activeRowsTimesVector(int active, const double* set2, int n,
     q[i + 3] = 0.0 + t3;
   }
   for (; i < active; i++) {
-    const double* x = set2 + static_cast<size_t>(i) * static_cast<size_t>(n);
+    const double* x = data.row(J[i]);
     double t = 0.0;
     for (int k = 0; k < n; k++) {
       t += x[k] * p[k];
@@ -93,12 +81,12 @@ static void activeRowsTimesVector(int active, const double* set2, int n,
 }
 
 double cglsFun1(int active, int* J, const double* Y,
-                double* set2, int n, double* q, 
+                const AlgIn& data, double* q,
                 double* p, double cpos, double cneg){
   double omega_q = 0.0;
   int i = 0;
 
-  activeRowsTimesVector(active, set2, n, p, q);
+  activeRowsTimesVector(active, J, data, p, q);
 
   for (i = 0; i < active; i++) {
     omega_q += ((Y[J[i]]==1)? cpos : cneg) * (q[i]) * (q[i]);
@@ -107,8 +95,8 @@ double cglsFun1(int active, int* J, const double* Y,
   return(omega_q);
 }
 
-/* r += z[i] * x_i for one row of set2, like the reference BLAS daxpy,
-   which skips the row when z[i] is zero. */
+/* r += z[i] * x_i for one row, like the reference BLAS daxpy, which skips
+   the row when z[i] is zero. */
 static inline void addScaledRow(double zi, const double* x, int n, double* r) {
   if (zi != 0.0) {
     for (int k = 0; k < n; k++) {
@@ -118,9 +106,10 @@ static inline void addScaledRow(double zi, const double* x, int n, double* r) {
 }
 
 void cglsFun2(int active, int* J, const double* Y,
-              double* set2, int n0, int n, double* q, 
+              const AlgIn& data, double* q,
               double* o, double* z, double* r, 
               double cpos, double cneg){
+  const int n = data.n;
   int i = 0;
   // Rows are added to r four at a time, in the same order per element as
   // one daxpy per row, so that r is loaded and stored once per four rows.
@@ -129,10 +118,10 @@ void cglsFun2(int active, int* J, const double* Y,
       o[J[j]] += q[j];
       z[j] -= ((Y[J[j]]==1)? cpos : cneg) * q[j];
     }
-    const double* x0 = set2 + static_cast<size_t>(i) * static_cast<size_t>(n);
-    const double* x1 = x0 + n;
-    const double* x2 = x1 + n;
-    const double* x3 = x2 + n;
+    const double* x0 = data.row(J[i]);
+    const double* x1 = data.row(J[i + 1]);
+    const double* x2 = data.row(J[i + 2]);
+    const double* x3 = data.row(J[i + 3]);
     const double z0 = z[i], z1 = z[i + 1], z2 = z[i + 2], z3 = z[i + 3];
     if (z0 != 0.0 && z1 != 0.0 && z2 != 0.0 && z3 != 0.0) {
       for (int k = 0; k < n; k++) {
@@ -153,8 +142,7 @@ void cglsFun2(int active, int* J, const double* Y,
   for (; i < active; i++) {
     o[J[i]] += q[i];
     z[i] -= ((Y[J[i]]==1)? cpos : cneg) * q[i];
-    addScaledRow(z[i],
-                 set2 + static_cast<size_t>(i) * static_cast<size_t>(n), n, r);
+    addScaledRow(z[i], data.row(J[i]), n, r);
   }
 }
 
@@ -165,18 +153,18 @@ void cglsFun2(int active, int* J, const double* Y,
    (x)[(i) + 2] * (y)[(i) + 2] + (x)[(i) + 3] * (y)[(i) + 3] +      \
    (x)[(i) + 4] * (y)[(i) + 4])
 
-/* o[rows[i]] = x_{rows[i]}' w + w[n0] for the given rows, where x has n0
-   features and w[n0] is the intercept. Same result as one ddot per row, but
-   four rows are processed together so that their additions and memory
-   loads overlap. */
-static void scoreRows(const int* rows, int numRows, double** set, int n0,
+/* o[rows[i]] = x_{rows[i]}' w + w[n0] for the given rows, with the n0
+   features of each row and the intercept w[n0]. Same result as one ddot per
+   row over the features, but four rows are processed together so that their
+   additions and memory loads overlap. */
+static void scoreRows(const int* rows, int numRows, const AlgIn& data, int n0,
                       const double* w, double* o) {
   int i = 0;
   for (; i + 4 <= numRows; i += 4) {
-    const double* x0 = set[rows[i]];
-    const double* x1 = set[rows[i + 1]];
-    const double* x2 = set[rows[i + 2]];
-    const double* x3 = set[rows[i + 3]];
+    const double* x0 = data.row(rows[i]);
+    const double* x1 = data.row(rows[i + 1]);
+    const double* x2 = data.row(rows[i + 2]);
+    const double* x3 = data.row(rows[i + 3]);
     double t0 = 0.0, t1 = 0.0, t2 = 0.0, t3 = 0.0;
     int k = 0;
     for (; k < n0 - 4; k += 5) {
@@ -197,7 +185,7 @@ static void scoreRows(const int* rows, int numRows, double** set, int n0,
     o[rows[i + 3]] = t3 + w[n0];
   }
   for (; i < numRows; i++) {
-    const double* x = set[rows[i]];
+    const double* x = data.row(rows[i]);
     double t = 0.0;
     int k = 0;
     for (; k < n0 - 4; k += 5) {
@@ -222,8 +210,7 @@ int CGLS(const AlgIn& data, const double lambda, const int cgitermax,
   Timer tictoc;
   int active = Subset.d;
   int* J = Subset.vec;
-  double** set = data.vals;
-  const double* Y = data.Y;
+  const double* Y = data.Y.data();
   int n = data.n;
   double* beta = Weights.vec;
   double* o = Outputs.vec;
@@ -236,9 +223,6 @@ int CGLS(const AlgIn& data, const double lambda, const int cgitermax,
   int inc = 1;
   double one = 1;
   double negLambda = -lambda;
-  size_t rowStart = 0;
-  // contiguous copy of the active rows, with the intercept as last column
-  double* set2 = workspace.set2.data();
   double* r = workspace.r.data();
   for (i = n; i--;) {
     r[i] = 0.0;
@@ -246,10 +230,7 @@ int CGLS(const AlgIn& data, const double lambda, const int cgitermax,
   for (i = 0; i < active; i++) {
     ii = J[i];
     z[i] = ((Y[ii]==1)? cpos : cneg) * (Y[ii] - o[ii]);
-    rowStart = static_cast<size_t>(i) * static_cast<size_t>(n);
-    memcpy(set2 + rowStart, set[ii], sizeof(double)*static_cast<std::size_t>(n0));
-    set2[rowStart + n0] = 1.0;
-    daxpy_(&n, &(z[i]), set2 + rowStart, &inc, r, &inc);
+    addScaledRow(z[i], data.row(ii), n, r);
   }
   double* p = workspace.p.data();
   daxpy_(&n, &negLambda, beta, &inc, r, &inc);
@@ -267,7 +248,7 @@ int CGLS(const AlgIn& data, const double lambda, const int cgitermax,
   // iterate
   while (cgiter < cgitermax) {
     cgiter++;
-    omega_q = cglsFun1(active, J, Y, set2, n, q, p, cpos, cneg);
+    omega_q = cglsFun1(active, J, Y, data, q, p, cpos, cneg);
     gamma = omega1 / (lambda * omega_p + omega_q);
     inv_omega2 = 1 / omega1;
 
@@ -277,8 +258,7 @@ int CGLS(const AlgIn& data, const double lambda, const int cgitermax,
     daxpy_(&n, &gamma, p, &inc, beta, &inc);
     dscal_(&active, &gamma, q, &inc);
 
-    cglsFun2(active, J, Y, set2,
-             n0, n, q, o, z, r, cpos, cneg);
+    cglsFun2(active, J, Y, data, q, o, z, r, cpos, cneg);
 
     omega_z = ddot_(&active, z, &inc, z, &inc);
     omega1 = ddot_(&n, r, &inc, r, &inc);
@@ -313,8 +293,7 @@ int L2_SVM_MFN(const AlgIn& data, options& Options,
                vector_double& Outputs, double cpos, double cneg) {
   /* Disassemble the structures */
   Timer tictoc;
-  double** set = data.vals;
-  const double* Y = data.Y;
+  const double* Y = data.Y.data();
   int n = Weights.d;
   const int m = data.m;
   double lambda = Options.lambda;
@@ -379,7 +358,7 @@ int L2_SVM_MFN(const AlgIn& data, options& Options,
                Weights_bar,
                Outputs_bar, cpos, cneg, workspace);
     // outputs of the inactive examples, which CGLS did not update
-    scoreRows(ActiveSubset.vec + active, m - active, set, n0, w_bar, o_bar);
+    scoreRows(ActiveSubset.vec + active, m - active, data, n0, w_bar, o_bar);
     if (ini == 0) {
       cgitermax = CGITERMAX;
       ini = 1;

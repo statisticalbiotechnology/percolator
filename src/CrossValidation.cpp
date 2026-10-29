@@ -66,15 +66,6 @@ CrossValidation::CrossValidation(bool quickValidation,
   }
 }
 
-CrossValidation::~CrossValidation() {
-  for (unsigned int set = 0; set < numFolds_ * nestedXvalBins_; ++set) {
-    if (svmInputs_[set]) {
-      delete svmInputs_[set];
-    }
-    svmInputs_[set] = NULL;
-  }
-}
-
 /**
  * Sets up the SVM classifier:
  * - divide dataset into training and test sets for each fold
@@ -96,11 +87,8 @@ int CrossValidation::preIterationSetup(Scores& fullset,
   assert(nestedXvalBins_ >= 1u);
   // One input set per (nested) cross validation bin, to be reused multiple
   // times
-  for (unsigned int set = 0; set < numFolds_ * nestedXvalBins_; ++set) {
-    svmInputs_.push_back(new AlgIn(
-        fullset.size(), static_cast<int>(FeatureNames::getNumFeatures()) + 1));
-    assert(svmInputs_.back());
-  }
+  const int numFeatures = static_cast<int>(FeatureNames::getNumFeatures());
+  svmInputs_.assign(numFolds_ * nestedXvalBins_, AlgIn(numFeatures + 1));
 
   unsigned int decoysPerTarget = 1u;  // TODO: make this a command line argument
   {
@@ -316,7 +304,6 @@ int CrossValidation::doStep(const Normalizer* pNorm, double selectionFdr) {
   // ////
 
   // Create SVM input data for parallelization
-  std::vector<AlgIn*> svmInputsVec;
   std::vector<std::vector<Scores> > nestedTestScoresVec;
   {
     StageTimer stageTimer("build SVM input");
@@ -335,24 +322,23 @@ int CrossValidation::doStep(const Normalizer* pNorm, double selectionFdr) {
       // Set SVM input data for L2-SVM-MFN
       for (std::size_t nestedFold = 0; nestedFold < nestedXvalBins_;
            ++nestedFold) {
-        AlgIn* svmInput = svmInputs_[set * nestedXvalBins_ + nestedFold];
+        AlgIn& svmInput = svmInputs_[set * nestedXvalBins_ + nestedFold];
         Scores& nestedTrainSet = nestedTrainScores.empty()
                                      ? trainScores_[set]
                                      : nestedTrainScores[nestedFold];
         if ((VERB > 2) && (nestedFold == 0)) {
-          cerr << "Split " << set + 1 << ": Training with " << svmInput->positives
-               << " positives and " << svmInput->negatives << " negatives"
-               << std::endl;
+          cerr << "Split " << set + 1 << ": Training with "
+               << svmInput.positives << " positives and "
+               << svmInput.negatives << " negatives" << std::endl;
         }
-        nestedTrainSet.generateNegativeTrainingSet(*svmInput, 1.0);
+        nestedTrainSet.generateNegativeTrainingSet(svmInput, 1.0);
         nestedTrainSet.generatePositiveTrainingSet(
-            *svmInput, selectionFdr, 1.0, trainBestPositive_);
+            svmInput, selectionFdr, 1.0, trainBestPositive_);
         if ((VERB > 2) && (nestedXvalBins_ > 1u)) {
           cerr << "Split " << set + 1 << " nested fold " << nestedFold
-               << ": Training with " << svmInput->positives << " positives and "
-               << svmInput->negatives << " negatives" << std::endl;
+               << ": Training with " << svmInput.positives << " positives and "
+               << svmInput.negatives << " negatives" << std::endl;
         }
-        svmInputsVec.push_back(svmInput);
       }
     }
   }
@@ -362,9 +348,9 @@ int CrossValidation::doStep(const Normalizer* pNorm, double selectionFdr) {
 #pragma omp parallel for schedule(dynamic, 1) ordered
     for (int pairIdx = 0; pairIdx < classWeightsPerFold_.size(); pairIdx++) {
       CandidateCposCfrac* cpCnFold = &classWeightsPerFold_[pairIdx];
-      AlgIn* svmInput =
-          svmInputsVec[cpCnFold->set * nestedXvalBins_ +
-                       static_cast<unsigned int>(cpCnFold->nestedSet)];
+      const AlgIn& svmInput =
+          svmInputs_[cpCnFold->set * nestedXvalBins_ +
+                     static_cast<unsigned int>(cpCnFold->nestedSet)];
       trainCpCnPair(*cpCnFold, pOptions, svmInput);
     }
   }
@@ -383,7 +369,7 @@ int CrossValidation::doStep(const Normalizer* pNorm, double selectionFdr) {
  */
 void CrossValidation::trainCpCnPair(CandidateCposCfrac& cpCnFold,
                                     options& pOptions,
-                                    AlgIn* svmInput) {
+                                    const AlgIn& svmInput) {
   vector_double pWeights;
   pWeights.d = static_cast<int>(FeatureNames::getNumFeatures()) + 1;
   pWeights.vec = new double[pWeights.d];
@@ -394,7 +380,7 @@ void CrossValidation::trainCpCnPair(CandidateCposCfrac& cpCnFold,
   // Create storage vector for SVM algorithm
   vector_double Outputs;
   size_t numInputs =
-      static_cast<std::size_t>(svmInput->positives + svmInput->negatives);
+      static_cast<std::size_t>(svmInput.positives + svmInput.negatives);
   Outputs.vec = new double[numInputs];
   Outputs.d = static_cast<int>(numInputs);
 
@@ -409,7 +395,7 @@ void CrossValidation::trainCpCnPair(CandidateCposCfrac& cpCnFold,
   }
 
   // Call SVM algorithm (see ssl.cpp)
-  L2_SVM_MFN(*svmInput, pOptions, pWeights, Outputs, cpos, cfrac * cpos);
+  L2_SVM_MFN(svmInput, pOptions, pWeights, Outputs, cpos, cfrac * cpos);
 
   for (std::size_t i = FeatureNames::getNumFeatures() + 1; i--;) {
     cpCnFold.ww[i] = pWeights.vec[i];
@@ -448,21 +434,34 @@ int CrossValidation::mergeCpCnPairs(
   // The validation counts of all pairs are independent, so they are computed
   // in parallel. Without nested cross validation the training sets are the
   // validation sets.
+  auto testSet = [&](unsigned int set,
+                     unsigned int nestedSet) -> const Scores& {
+    const std::vector<Scores>& nestedTestScores = nestedTestScoresVec[set];
+    return nestedTestScores.empty() ? trainScores_[set]
+                                    : nestedTestScores[nestedSet];
+  };
+  const int numTestSets = static_cast<int>(numFolds_ * nestedXvalBins_);
+  std::vector<Scores::FeatureRows> testRows(numTestSets);
+#pragma omp parallel for schedule(dynamic, 1)
+  for (int idx = 0; idx < numTestSets; ++idx) {
+    testSet(idx / nestedXvalBins_, idx % nestedXvalBins_)
+        .getFeatureRows(testRows[idx]);
+  }
+
   std::vector<int> truePositives(classWeightsPerFold_.size());
   PosteriorEstimator::setNegative(true);  // also get q-values for decoys
 #pragma omp parallel for schedule(dynamic, 1)
   for (int pairIdx = 0; pairIdx < static_cast<int>(classWeightsPerFold_.size());
        ++pairIdx) {
     const CandidateCposCfrac& cpCnPair = classWeightsPerFold_[pairIdx];
-    const std::vector<Scores>& nestedTestScores =
-        nestedTestScoresVec[cpCnPair.set];
-    const Scores& testSet =
-        nestedTestScores.empty()
-            ? trainScores_[cpCnPair.set]
-            : nestedTestScores[static_cast<std::size_t>(cpCnPair.nestedSet)];
+    const unsigned int nestedSet =
+        static_cast<unsigned int>(cpCnPair.nestedSet);
     std::vector<std::pair<double, bool> > combined;
-    truePositives[pairIdx] = testSet.countTargetsBelowFdr(
-        cpCnPair.ww, testFdr_, skipDecoysPlusOne, combined);
+    truePositives[pairIdx] =
+        testSet(cpCnPair.set, nestedSet)
+            .countTargetsBelowFdr(
+                testRows[cpCnPair.set * nestedXvalBins_ + nestedSet],
+                cpCnPair.ww, testFdr_, skipDecoysPlusOne, combined);
   }
 
   for (int set = 0; set < static_cast<int>(numFolds_); ++set) {
@@ -513,15 +512,15 @@ int CrossValidation::mergeCpCnPairs(
       pWeights.d = static_cast<int>(FeatureNames::getNumFeatures()) + 1;
       pWeights.vec = new double[pWeights.d];
 
-      AlgIn* svmInput = svmInputs_[set * nestedXvalBins_];
-      trainScores_[set].generateNegativeTrainingSet(*svmInput, 1.0);
-      trainScores_[set].generatePositiveTrainingSet(*svmInput, selectionFdr,
+      AlgIn& svmInput = svmInputs_[set * nestedXvalBins_];
+      trainScores_[set].generateNegativeTrainingSet(svmInput, 1.0);
+      trainScores_[set].generatePositiveTrainingSet(svmInput, selectionFdr,
                                                     1.0, trainBestPositive_);
 
       // Create storage vector for SVM algorithm
       vector_double Outputs;
       size_t numInputs =
-          static_cast<std::size_t>(svmInput->positives + svmInput->negatives);
+          static_cast<std::size_t>(svmInput.positives + svmInput.negatives);
       Outputs.vec = new double[numInputs];
       Outputs.d = static_cast<int>(numInputs);
 
@@ -532,7 +531,7 @@ int CrossValidation::mergeCpCnPairs(
         Outputs.vec[ix] = 0;
       }
       // Call SVM algorithm (see ssl.cpp)
-      L2_SVM_MFN(*svmInput, pOptions, pWeights, Outputs, bestCposes[set],
+      L2_SVM_MFN(svmInput, pOptions, pWeights, Outputs, bestCposes[set],
                  bestCposes[set] * bestCfracs[set]);
 
       for (std::size_t i = FeatureNames::getNumFeatures() + 1; i--;) {

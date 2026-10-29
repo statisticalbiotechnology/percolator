@@ -57,8 +57,6 @@ class CrossValidation {
                   double decoyFractionTraining,
                   unsigned int numFolds);
 
-  ~CrossValidation();
-
   int preIterationSetup(Scores& fullset,
                         SanityCheck* pCheck,
                         const Normalizer* pNorm);
@@ -88,7 +86,7 @@ class CrossValidation {
   }
 
  protected:
-  std::vector<AlgIn*> svmInputs_;
+  std::vector<AlgIn> svmInputs_;
   std::vector<std::vector<double> > weights_;  // svm weights for each fold
   std::vector<CandidateCposCfrac>
       classWeightsPerFold_;  // cpos, cneg pairs to train for each nested CV
@@ -126,7 +124,7 @@ class CrossValidation {
   void initializeGridSearch(double targetDecoySizeRatio);
   void trainCpCnPair(CandidateCposCfrac& cpCnFold,
                      options& pOptions,
-                     AlgIn* svmInput);
+                     const AlgIn& svmInput);
 
   int mergeCpCnPairs(double selectionFdr,
                      options& pOptions,
