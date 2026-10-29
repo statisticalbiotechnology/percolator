@@ -325,14 +325,11 @@ int CrossValidation::doStep(const Normalizer* pNorm, double selectionFdr) {
     StageTimer stageTimer("build SVM input");
     for (std::size_t set = 0; set < numFolds_; ++set) {
       // Without nested cross validation, the training set is also used for
-      // validation (sub-optimal cross validation). It is only copied if
-      // generatePositiveTrainingSet would reorder it.
+      // validation (sub-optimal cross validation).
       std::vector<Scores> nestedTrainScores, nestedTestScores;
       if (nestedXvalBins_ > 1) {
         trainScores_[set].createXvalSetsBySpectrum(
             nestedTrainScores, nestedTestScores, nestedXvalBins_);
-      } else if (trainBestPositive_) {
-        nestedTrainScores.push_back(trainScores_[set]);
       }
       nestedTestScoresVec.push_back(std::move(nestedTestScores));
       // Set SVM input data for L2-SVM-MFN

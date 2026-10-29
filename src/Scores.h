@@ -106,7 +106,7 @@ class Scores {
   void generatePositiveTrainingSet(AlgIn& data,
                                    const double fdr,
                                    const double cpos,
-                                   const bool trainBestPositive);
+                                   const bool trainBestPositive) const;
   void generateNegativeTrainingSet(AlgIn& data, const double cneg);
 
   void recalculateSizes();

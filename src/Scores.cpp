@@ -582,25 +582,33 @@ void Scores::generateNegativeTrainingSet(AlgIn& data, const double cneg) {
   data.negatives = data.m;
 }
 
+/**
+ * Appends the targets with q-value at most fdr to the training set, in the
+ * order of this set, or with trainBestPositive only the best-scoring one of
+ * each spectrum, by decreasing score. Does not change this set.
+ */
 void Scores::generatePositiveTrainingSet(AlgIn& data,
                                          const double fdr,
                                          const double cpos,
-                                         const bool trainBestPositive) {
+                                         const bool trainBestPositive) const {
   int p = 0;
-
-  std::vector<ScoreHolder>::iterator lastUniqueIt = scores_.end();
   if (trainBestPositive) {
-    std::sort(scores_.begin(), scores_.end(), OrderScanLabel());
-    lastUniqueIt =
-        std::unique(scores_.begin(), scores_.end(), UniqueScanLabel());
-    std::sort(scores_.begin(), lastUniqueIt, greater<ScoreHolder>());
-  }
-
-  std::vector<ScoreHolder>::const_iterator scoreIt = scores_.begin();
-  for (; scoreIt != lastUniqueIt; ++scoreIt) {
-    if (scoreIt->isTarget()) {
-      if (scoreIt->q <= fdr) {
-        data.add(scoreIt->pPSM->features, 1);
+    std::vector<ScoreHolder> best;
+    for (const ScoreHolder& sh : scores_) {
+      if (sh.isTarget() && sh.q <= fdr) best.push_back(sh);
+    }
+    std::sort(best.begin(), best.end(), OrderScanLabel());
+    best.erase(std::unique(best.begin(), best.end(), UniqueScanLabel()),
+               best.end());
+    std::sort(best.begin(), best.end(), greater<ScoreHolder>());
+    for (const ScoreHolder& sh : best) {
+      data.add(sh.pPSM->features, 1);
+      ++p;
+    }
+  } else {
+    for (const ScoreHolder& sh : scores_) {
+      if (sh.isTarget() && sh.q <= fdr) {
+        data.add(sh.pPSM->features, 1);
         ++p;
       }
     }
