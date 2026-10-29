@@ -151,7 +151,7 @@ class ProteinProbEstimator {
   
   inline bool lastProteinInGroup(
       std::vector<ProteinScoreHolder>::const_iterator it) {
-    return !trivialGrouping_ || it+1 != proteins_.end() 
+    return !trivialGrouping_ || it+1 == proteins_.end() 
                              || it->getGroupId() != (it+1)->getGroupId();
   }
   /** functions to count number of target and decoy proteins **/

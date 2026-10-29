@@ -68,6 +68,7 @@ class DataSet {
 
   void fillScores(std::vector<ScoreHolder>& scores);
   void fillFeatures(std::vector<double*>& features);
+  void clearFeaturePointers();
   
   void readPsm(const std::string& line, const unsigned int lineNr,
                const std::vector<OptionalField>& optionalFields, 

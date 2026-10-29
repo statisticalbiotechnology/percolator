@@ -31,11 +31,11 @@ void FeatureMemoryPool::createNewBlock() {
 
 void FeatureMemoryPool::destroyPool() {
   for (size_t i = 0; i < memStarts_.size(); ++i) {
-    if (memStarts_.at(i) != NULL) {
-      delete[] memStarts_.at(i);
-      memStarts_.at(i) = NULL;
-    }
+    delete[] memStarts_.at(i);
   }
+  memStarts_.clear();
+  freeRows_.clear();
+  initializedRows_ = 0;
   isInitialized_ = false;
 }
 

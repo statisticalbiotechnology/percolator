@@ -23,6 +23,16 @@ SetHandler::~SetHandler() {
   reset();
 }
 
+/**
+ * Frees the feature rows of all PSMs, which are only needed for training.
+ */
+void SetHandler::releaseFeatures() {
+  for (DataSet* subset : subsets_) {
+    subset->clearFeaturePointers();
+  }
+  featurePool_.destroyPool();
+}
+
 void SetHandler::reset() {
   for (unsigned int ix = 0; ix < subsets_.size(); ix++) {
     if (subsets_[ix] != NULL) {

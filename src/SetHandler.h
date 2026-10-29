@@ -109,6 +109,7 @@ class SetHandler {
   FeatureMemoryPool& getFeaturePool() { return featurePool_; }
   
   void reset();
+  void releaseFeatures();
 
  protected:
   size_t maxPSMs_;

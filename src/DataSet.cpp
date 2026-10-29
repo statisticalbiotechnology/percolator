@@ -64,6 +64,12 @@ void DataSet::fillScores(std::vector<ScoreHolder>& scores) {
   }
 }
 
+void DataSet::clearFeaturePointers() {
+  for (PSMDescription* psm : psms_) {
+    psm->features = NULL;
+  }
+}
+
 void DataSet::fillFeatures(std::vector<double*>& features) {
   std::vector<PSMDescription*>::iterator it = psms_.begin();
   for ( ; it != psms_.end(); ++it) {

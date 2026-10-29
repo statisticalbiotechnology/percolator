@@ -1174,6 +1174,7 @@ int Caller::run() {
       crossValidation.getAvgWeights(rawWeights, pNorm_);
     }
   }
+  setHandler.releaseFeatures();
 
   if (setHandler.getMaxPSMs() > 0u) {
     if (VERB > 0) {
