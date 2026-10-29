@@ -140,8 +140,7 @@ TEST_F(CrossValidationTest, doStepTest)
     // be weighted.
 
     SanityCheck *pCheck = new SanityCheck();
-    int numInit = crossValidation->preIterationSetup(scores, pCheck, pNorm,
-                                                setHandler.getFeaturePool());
+    int numInit = crossValidation->preIterationSetup(scores, pCheck, pNorm);
     std::vector< std::vector<double> > const& w = crossValidation->weights();
     for (int i = 0 ; i < 3 ; ++i) {
         EXPECT_EQ(1.0, w[i][0]);

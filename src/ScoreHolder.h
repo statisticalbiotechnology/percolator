@@ -20,8 +20,6 @@
 #include "LabelType.h"
 #include "PSMDescription.h"
 
-class Scores;  // forward declaration
-
 /*
  * ScoreHolder is a class that provides a way to assign score value to a
  * PSMDescription and have a way to compare PSMs based on the assigned
@@ -33,7 +31,7 @@ class Scores;  // forward declaration
  */
 class ScoreHolder {
  public:
-  double score, q, pep, p;
+  double score, q, pep;
   PSMDescription* pPSM;
   LabelType label;
 
@@ -41,12 +39,10 @@ class ScoreHolder {
       : score(0.0),
         q(0.0),
         pep(0.0),
-        p(0.0),
-        label(LabelType::UNDEFINED),
-        pPSM(NULL) {}
+        pPSM(NULL),
+        label(LabelType::UNDEFINED) {}
   ScoreHolder(const double s, const LabelType l, PSMDescription* psm = NULL)
-      : score(s), q(0.0), pep(0.0), p(0.0), label(l), pPSM(psm) {}
-  virtual ~ScoreHolder() {}
+      : score(s), q(0.0), pep(0.0), pPSM(psm), label(l) {}
 
   std::pair<double, bool> toPair() const {
     return pair<double, bool>(score, isTarget());
@@ -57,24 +53,27 @@ class ScoreHolder {
   }
   inline bool isDecoy() const { return label == LabelType::DECOY; }
   inline PSMDescription* getPSM() const { return pPSM; }
-  void printPSM(ostream& os, bool printDecoys, bool printExpMass);
-  void printPepXML(ostream& os, map<char, float>& aaWeight, int index);
-  void printPeptide(ostream& os,
-                    bool printDecoys,
-                    bool printExpMass,
-                    Scores& fullset);
-  std::string getCharge(std::string id);
 };
-struct lessThanBaseName {
-  inline bool operator()(const ScoreHolder& struct1,
-                         const ScoreHolder& struct2) {
-    std::string id1 = struct1.pPSM->getId();
-    std::string id2 = struct2.pPSM->getId();
-    return (id1 < id2);
-  }
-};
-bool operator>(const ScoreHolder& one, const ScoreHolder& other);
-bool operator<(const ScoreHolder& one, const ScoreHolder& other);
+
+/* Orders by score, then scan, experimental mass and label. Inlined because
+   they are the comparators of the large sorts. */
+inline bool operator>(const ScoreHolder& one, const ScoreHolder& other) {
+  if (one.score != other.score) return one.score > other.score;
+  if (one.pPSM->scan != other.pPSM->scan)
+    return one.pPSM->scan > other.pPSM->scan;
+  if (one.pPSM->expMass != other.pPSM->expMass)
+    return one.pPSM->expMass > other.pPSM->expMass;
+  return one.label > other.label;
+}
+
+inline bool operator<(const ScoreHolder& one, const ScoreHolder& other) {
+  if (one.score != other.score) return one.score < other.score;
+  if (one.pPSM->scan != other.pPSM->scan)
+    return one.pPSM->scan < other.pPSM->scan;
+  if (one.pPSM->expMass != other.pPSM->expMass)
+    return one.pPSM->expMass < other.pPSM->expMass;
+  return one.label < other.label;
+}
 
 struct lexicOrderProb {
   static int compStrIt(const std::string& sv1, const std::string& sv2) {

@@ -15,7 +15,6 @@
 
  *******************************************************************************/
 
-#include <boost/assign.hpp>
 #include <cassert>
 #include <cmath>
 #include <fstream>
@@ -141,6 +140,8 @@ void Scores::print(LabelType label, std::ostream& os) {
 
 void Scores::populateWithPSMs(SetHandler& setHandler) {
   scores_.clear();
+  scores_.reserve(setHandler.getSizeFromLabel(LabelType::TARGET) +
+                  setHandler.getSizeFromLabel(LabelType::DECOY));
   setHandler.populateScoresWithPSMs(scores_, LabelType::TARGET);
   setHandler.populateScoresWithPSMs(scores_, LabelType::DECOY);
   totalNumberOfTargets_ =
@@ -197,14 +198,12 @@ void Scores::populateWithPSMs(SetHandler& setHandler) {
  * @param train vector containing the training sets of PSMs
  * @param test vector containing the test sets of PSMs
  * @param xval_fold number of folds in train and test
- * @param featurePool pool for storing features to optimize memory access in SVM
  * @param decoyFractionTraining fraction of decoys to use for training, will
  * be 1 unless RESET algorithm is used
  */
 void Scores::createXvalSetsBySpectrum(std::vector<Scores>& train,
                                       std::vector<Scores>& test,
                                       unsigned int xval_fold,
-                                      FeatureMemoryPool& featurePool,
                                       double decoyFractionTraining,
                                       unsigned int decoysPerTarget) {
   // set the number of cross validation folds for train and test to xval_fold
@@ -305,17 +304,6 @@ void Scores::createXvalSetsBySpectrum(std::vector<Scores>& train,
     train[i].setNullTargetWinProb(trainNullTargetWinProb);
     test[i].setNullTargetWinProb(trainNullTargetWinProb);
   }
-
-  if (featurePool.isInitialized()) {
-    boost::unordered_map<double*, double*> movedAddresses;
-    size_t idx = 0;
-    for (unsigned int i = 0; i < xval_fold; ++i) {
-      bool isTarget = true;
-      test[i].reorderFeatureRows(featurePool, isTarget, movedAddresses, idx);
-      isTarget = false;
-      test[i].reorderFeatureRows(featurePool, isTarget, movedAddresses, idx);
-    }
-  }
 }
 
 void Scores::recalculateSizes() {
@@ -330,30 +318,6 @@ void Scores::recalculateSizes() {
     }
   }
   targetDecoySizeRatio_ = totalNumberOfTargets_ / (double)totalNumberOfDecoys_;
-}
-
-void Scores::reorderFeatureRows(
-    FeatureMemoryPool& featurePool,
-    bool isTarget,
-    boost::unordered_map<double*, double*>& movedAddresses,
-    size_t& idx) {
-  size_t numFeatures = FeatureNames::getNumFeatures();
-  std::vector<ScoreHolder>::const_iterator scoreIt = scores_.begin();
-  for (; scoreIt != scores_.end(); ++scoreIt) {
-    if (scoreIt->isTarget() == isTarget) {
-      double* newAddress =
-          featurePool.addressFromIdx(static_cast<unsigned int>(idx++));
-      double* oldAddress = scoreIt->pPSM->features;
-      while (movedAddresses.find(oldAddress) != movedAddresses.end()) {
-        oldAddress = movedAddresses[oldAddress];
-      }
-      std::swap_ranges(oldAddress, oldAddress + numFeatures, newAddress);
-      scoreIt->pPSM->features = newAddress;
-      if (oldAddress != newAddress) {
-        movedAddresses[newAddress] = oldAddress;
-      }
-    }
-  }
 }
 
 /**

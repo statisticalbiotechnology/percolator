@@ -24,7 +24,8 @@ void FeatureMemoryPool::createPool(size_t numFeatures) {
 }
 
 void FeatureMemoryPool::createNewBlock() {
-  double* memStart = new double[numFeatures_ * numRowsPerBlock_]();
+  // every row is completely written by its user, so no zero-initialization
+  double* memStart = new double[numFeatures_ * numRowsPerBlock_];
   memStarts_.push_back(memStart);
 }
 

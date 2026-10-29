@@ -787,7 +787,13 @@ void Caller::calculatePSMProb(Scores& allScores, bool isUniquePeptideRun) {
     std::cerr << "Calculating posterior error probabilities (PEPs)."
               << std::endl;
   }
-  allScores.calcPep(useIrlsPep_, useInterpolatingPep_, usePavaPep_);
+  // PSM-level PEPs are only needed if they are written; the unique peptide run
+  // computes its own PEPs, which are also used for protein inference.
+  bool pepNeeded = isUniquePeptideRun || writeOutput || !psmResultFN_.empty() ||
+                   !decoyPsmResultFN_.empty();
+  if (pepNeeded) {
+    allScores.calcPep(useIrlsPep_, useInterpolatingPep_, usePavaPep_);
+  }
   writeResults(allScores, isUniquePeptideRun, writeOutput);
 }
 
@@ -1074,7 +1080,8 @@ int Caller::run() {
     SanityCheck sc;
     std::vector<std::vector<double>> ww(
         1, std::vector<double>(DataSet::getNumFeatures() + 1, 0.0));
-    std::vector<Scores> tmpScoreVector(1, std::move(allScores));
+    std::vector<Scores> tmpScoreVector;
+    tmpScoreVector.push_back(std::move(allScores));
     sc.getInitDirection(tmpScoreVector, tmpScoreVector, pNorm_, ww,
                         selectionFdr_, initialSelectionFdr_);
     allScores = std::move(tmpScoreVector.at(0));
@@ -1109,55 +1116,63 @@ int Caller::run() {
     // - apply decoy factor in PosteriorEstimator::estimatePEP
   }
 
-  CrossValidation crossValidation(
-      quickValidation_, reportEachIteration_, testFdr_, selectionFdr_,
-      initialSelectionFdr_, selectedCpos_, selectedCneg_, numIterations_,
-      useMixMax_, nestedXvalBins_, trainBestPositive_, numThreads_,
-      skipNormalizeScores_, decoyFractionTraining, numFolds);
-
-  int firstNumberOfPositives = crossValidation.preIterationSetup(
-      allScores, pCheck_, pNorm_, setHandler.getFeaturePool());
-
-  if (VERB > 0) {
-    cerr << "Found " << firstNumberOfPositives << " test set positives with q<"
-         << testFdr_ << " in initial direction" << endl;
-  }
-
-  timer.stop();
-  if (VERB > 1)
-    cerr << "Reading in data and feature calculation took "
-         << timer.getCPUTimeStr() << " cpu seconds or "
-         << timer.getWallTimeStr() << " seconds wall clock time." << endl;
-  timer.reset();
-
-  if (tabOutputFN_.length() > 0) {
-    setHandler.writeTab(tabOutputFN_, pCheck_);
-  }
-
-  // Do the SVM training
+  // The cross-validation sets and SVM inputs are only needed for training,
+  // the scope releases them before the post-processing steps.
+  std::vector<double> rawWeights;
   {
-    StageTimer stageTimer("training");
-    crossValidation.train(pNorm_);
-  }
+    CrossValidation crossValidation(
+        quickValidation_, reportEachIteration_, testFdr_, selectionFdr_,
+        initialSelectionFdr_, selectedCpos_, selectedCneg_, numIterations_,
+        useMixMax_, nestedXvalBins_, trainBestPositive_, numThreads_,
+        skipNormalizeScores_, decoyFractionTraining, numFolds);
 
-  // Calculate the final SVM scores and clean up structures
-  {
-    StageTimer stageTimer("post-iteration processing");
-    crossValidation.postIterationProcessing(allScores, pCheck_);
-  }
+    int firstNumberOfPositives =
+        crossValidation.preIterationSetup(allScores, pCheck_, pNorm_);
 
-  if (weightOutputFN_.size() > 0) {
-    ofstream weightStream(weightOutputFN_.c_str(), ios::out);
-    crossValidation.printAllWeights(weightStream, pNorm_);
-    weightStream.close();
+    if (VERB > 0) {
+      cerr << "Found " << firstNumberOfPositives
+           << " test set positives with q<" << testFdr_
+           << " in initial direction" << endl;
+    }
+
+    timer.stop();
+    if (VERB > 1)
+      cerr << "Reading in data and feature calculation took "
+           << timer.getCPUTimeStr() << " cpu seconds or "
+           << timer.getWallTimeStr() << " seconds wall clock time." << endl;
+    timer.reset();
+
+    if (tabOutputFN_.length() > 0) {
+      setHandler.writeTab(tabOutputFN_, pCheck_);
+    }
+
+    // Do the SVM training
+    {
+      StageTimer stageTimer("training");
+      crossValidation.train(pNorm_);
+    }
+
+    // Calculate the final SVM scores and clean up structures
+    {
+      StageTimer stageTimer("post-iteration processing");
+      crossValidation.postIterationProcessing(allScores, pCheck_);
+    }
+
+    if (weightOutputFN_.size() > 0) {
+      ofstream weightStream(weightOutputFN_.c_str(), ios::out);
+      crossValidation.printAllWeights(weightStream, pNorm_);
+      weightStream.close();
+    }
+
+    if (setHandler.getMaxPSMs() > 0u) {
+      crossValidation.getAvgWeights(rawWeights, pNorm_);
+    }
   }
 
   if (setHandler.getMaxPSMs() > 0u) {
     if (VERB > 0) {
       cerr << "Scoring full list of PSMs with trained SVMs." << endl;
     }
-    std::vector<double> rawWeights;
-    crossValidation.getAvgWeights(rawWeights, pNorm_);
     setHandler.reset();
     allScores.reset();
 

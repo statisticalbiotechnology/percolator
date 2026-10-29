@@ -168,7 +168,7 @@ endif()
 add_library(perclibrary STATIC BaseSpline.cpp MassHandler.cpp ResultHolder.cpp PSMDescription.cpp MonotoneRegressor.cpp IsotonicPEP.cpp
 								  SetHandler.cpp StdvNormalizer.cpp svm.cpp Caller.cpp CompositionSorter.cpp CrossValidation.cpp Enzyme.cpp Globals.cpp NoNormalizer.cpp Normalizer.cpp
 								  SanityCheck.cpp UniNormalizer.cpp DataSet.cpp TabFileValidator.cpp FeatureNames.cpp LogisticRegression.cpp Numerical.cpp Option.cpp PosteriorEstimator.cpp
-								  ProteinProbEstimator.cpp ProteinFDRestimator.cpp ScoreHolder.cpp Scores.cpp PseudoRandom.cpp Set.cpp SqtSanityCheck.cpp ssl.cpp PackedVector.cpp
+								  ProteinProbEstimator.cpp ProteinFDRestimator.cpp Scores.cpp PseudoRandom.cpp Set.cpp SqtSanityCheck.cpp ssl.cpp PackedVector.cpp
 								  PackedMatrix.cpp Logger.cpp MyException.cpp ProteinScoreHolder.cpp PickedProteinInterface.cpp FeatureMemoryPool.cpp Timer.cpp TmpDir.cpp ValidateTabFile.cpp Vector.cpp)
 
 if(OpenMP_CXX_FOUND)

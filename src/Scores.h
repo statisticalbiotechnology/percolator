@@ -36,8 +36,6 @@
 #include "PseudoRandom.h"
 #include "ScoreHolder.h"
 
-#include <boost/unordered/unordered_map.hpp>
-
 class SetHandler;
 class AlgIn;
 
@@ -93,7 +91,6 @@ class Scores {
   void createXvalSetsBySpectrum(std::vector<Scores>& train,
                                 std::vector<Scores>& test,
                                 unsigned int xval_fold,
-                                FeatureMemoryPool& featurePool,
                                 double decoyFractionTraining = 1.0,
                                 unsigned int decoysPerTarget = 1u);
 
@@ -158,11 +155,6 @@ class Scores {
   std::vector<ScoreHolder> scores_;
   std::map<PSMDescription*, std::vector<PSMDescription*> > peptidePsmMap_;
 
-  void reorderFeatureRows(
-      FeatureMemoryPool& featurePool,
-      bool isTarget,
-      boost::unordered_map<double*, double*>& movedAddresses,
-      size_t& idx);
   void getScoreLabelPairs(std::vector<std::pair<double, bool> >& combined);
   int calcQvals(double fdr, bool skipDecoysPlusOne,
                 std::vector<std::pair<double, bool> >& combined);

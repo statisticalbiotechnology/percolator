@@ -61,8 +61,7 @@ class CrossValidation {
 
   int preIterationSetup(Scores& fullset,
                         SanityCheck* pCheck,
-                        const Normalizer* pNorm,
-                        FeatureMemoryPool& featurePool);
+                        const Normalizer* pNorm);
 
   void train(const Normalizer* pNorm);
 

@@ -24,7 +24,7 @@
 
 class FeatureMemoryPool {
  private:
-   static const unsigned int kBlockSize = 65536; // in number of doubles, e.g. 0.5MB if sizeof(double) = 8
+   static const unsigned int kBlockSize = 1u << 20; // in number of doubles, e.g. 8MB if sizeof(double) = 8
    unsigned int numRowsPerBlock_, numFeatures_, initializedRows_;
    std::vector<double*> memStarts_;
    std::vector<double*> freeRows_;

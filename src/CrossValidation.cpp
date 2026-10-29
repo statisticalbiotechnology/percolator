@@ -91,8 +91,7 @@ CrossValidation::~CrossValidation() {
  */
 int CrossValidation::preIterationSetup(Scores& fullset,
                                        SanityCheck* pCheck,
-                                       const Normalizer* pNorm,
-                                       FeatureMemoryPool& featurePool) {
+                                       const Normalizer* pNorm) {
   assert(nestedXvalBins_ >= 1u);
   // One input set per (nested) cross validation bin, to be reused multiple
   // times
@@ -106,8 +105,7 @@ int CrossValidation::preIterationSetup(Scores& fullset,
   {
     StageTimer stageTimer("cross-validation split");
     fullset.createXvalSetsBySpectrum(trainScores_, testScores_, numFolds_,
-                                     featurePool, decoyFractionTraining_,
-                                     decoysPerTarget);
+                                     decoyFractionTraining_, decoysPerTarget);
   }
 
   // initialize weights vector for all folds
@@ -320,9 +318,8 @@ int CrossValidation::doStep(const Normalizer* pNorm, double selectionFdr) {
       std::vector<Scores> nestedTrainScores(nestedXvalBins_, usePi0_),
           nestedTestScores(nestedXvalBins_, usePi0_);
       if (nestedXvalBins_ > 1) {
-        FeatureMemoryPool featurePool;
         trainScores_[set].createXvalSetsBySpectrum(
-            nestedTrainScores, nestedTestScores, nestedXvalBins_, featurePool);
+            nestedTrainScores, nestedTestScores, nestedXvalBins_);
       } else {
         // sub-optimal cross validation
         nestedTrainScores[0] = trainScores_[set];

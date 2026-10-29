@@ -313,7 +313,7 @@ void ProteinProbEstimator::setTargetandDecoysNames(Scores& peptideScores) {
     std::vector<std::string>::iterator protIt = psm->pPSM->proteinIds.begin();
     for (; protIt != psm->pPSM->proteinIds.end(); protIt++) {
       ProteinScoreHolder::Peptide peptide(psm->pPSM->getPeptideSequence(), 
-          psm->isDecoy(), psm->p, psm->pep, psm->q, psm->score);
+          psm->isDecoy(), 0.0, psm->pep, psm->q, psm->score);
       if (proteinToIdxMap_.find(*protIt) == proteinToIdxMap_.end()) {
 	      ProteinScoreHolder newProtein(*protIt, psm->isDecoy(), peptide, ++numGroups);
 	      proteinToIdxMap_[*protIt] = proteins_.size();

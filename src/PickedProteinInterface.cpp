@@ -254,8 +254,6 @@ void PickedProteinInterface::groupProteins(Scores& peptideScores,
     std::set<std::string> proteinsInGroup;
     bool isFirst = true, isShared = false;
     
-    if (peptideIt->p > maxPeptidePval_) continue;
-    
     for (std::vector<std::string>::iterator protIt = peptideIt->pPSM->proteinIds.begin(); 
             protIt != peptideIt->pPSM->proteinIds.end(); protIt++) {
       std::string proteinId = *protIt;
@@ -285,7 +283,7 @@ void PickedProteinInterface::groupProteins(Scores& peptideScores,
     
     if (!isShared) {
       ProteinScoreHolder::Peptide peptide(peptideIt->pPSM->getPeptideSequence(), 
-          peptideIt->isDecoy(), peptideIt->p, peptideIt->pep, peptideIt->q, peptideIt->score);
+          peptideIt->isDecoy(), 0.0, peptideIt->pep, peptideIt->q, peptideIt->score);
       if (proteinToIdxMap_.find(lastProteinId) == proteinToIdxMap_.end()) {
         if (proteinsInGroup.size() > 1) {
           groupProteinIds[lastProteinId] = proteinsInGroup;
