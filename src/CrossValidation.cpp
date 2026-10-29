@@ -273,6 +273,7 @@ int CrossValidation::doStep(const Normalizer* pNorm, double selectionFdr) {
   pOptions.epsilon = EPSILON;
   pOptions.cgitermax = CGITERMAX;
   pOptions.mfnitermax = MFNITERMAX;
+  pOptions.directSolve = !classicTraining_;
   int estTruePos = 0;
 
   // for determining an appropriate positive training set, the decoys+1 in the

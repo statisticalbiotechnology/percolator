@@ -41,7 +41,8 @@ extern "C" {
 SolverWorkspace::SolverWorkspace(int m, int n)
     : z(static_cast<size_t>(m)), q(static_cast<size_t>(m)),
       r(static_cast<size_t>(n)), p(static_cast<size_t>(n)),
-      deltas(static_cast<size_t>(m)) {}
+      deltas(static_cast<size_t>(m)),
+      gram(static_cast<size_t>(n) * static_cast<size_t>(n)) {}
 
 /* q[i] = x_{J[i]}' p for the active rows (length n, intercept included).
    Gives the same result as the reference BLAS dgemv with trans='T', alpha=1
@@ -199,6 +200,77 @@ static void scoreRows(const int* rows, int numRows, const AlgIn& data, int n0,
 }
 #undef DDOT_BLOCK
 
+/* Solves the same least squares problem as CGLS exactly, by Cholesky
+   factorisation of the normal equations
+     (lambda I + sum_i C_i x_i x_i') beta = sum_i C_i Y_i x_i
+   over the active examples. The n x n system (n = number of features plus
+   one) is built in a single pass over the active rows, whereas CGLS needs
+   two passes per iteration. Updates the outputs of the active examples. */
+int directLeastSquares(const AlgIn& data, const double lambda, const int* J,
+                       int active, double* beta, double* o, double cpos,
+                       double cneg, SolverWorkspace& workspace) {
+  const int n = data.n;
+  const double* Y = data.Y.data();
+  double* G = workspace.gram.data();  // upper triangle, row-major
+  double* b = workspace.r.data();
+  std::fill(G, G + static_cast<size_t>(n) * n, 0.0);
+  std::fill(b, b + n, 0.0);
+  for (int i = 0; i < active; i++) {
+    const int ii = J[i];
+    const double* x = data.row(ii);
+    const double c = (Y[ii] == 1) ? cpos : cneg;
+    for (int j = 0; j < n; j++) {
+      const double cx = c * x[j];
+      b[j] += cx * Y[ii];
+      double* Gj = G + static_cast<size_t>(j) * n;
+      for (int k = j; k < n; k++) {
+        Gj[k] += cx * x[k];
+      }
+    }
+  }
+  // Cholesky factorisation G = L L', with L stored in the lower triangle
+  for (int j = 0; j < n; j++) {
+    G[static_cast<size_t>(j) * n + j] += lambda;
+    for (int k = j + 1; k < n; k++) {
+      G[static_cast<size_t>(k) * n + j] = G[static_cast<size_t>(j) * n + k];
+    }
+  }
+  for (int j = 0; j < n; j++) {
+    double* Lj = G + static_cast<size_t>(j) * n;
+    double s = Lj[j];
+    for (int k = 0; k < j; k++) s -= Lj[k] * Lj[k];
+    if (!(s > 0.0)) return 0;  // not positive definite
+    const double ljj = std::sqrt(s);
+    Lj[j] = ljj;
+    for (int i = j + 1; i < n; i++) {
+      double* Li = G + static_cast<size_t>(i) * n;
+      double t = Li[j];
+      for (int k = 0; k < j; k++) t -= Li[k] * Lj[k];
+      Li[j] = t / ljj;
+    }
+  }
+  // forward and back substitution
+  for (int i = 0; i < n; i++) {
+    const double* Li = G + static_cast<size_t>(i) * n;
+    double t = b[i];
+    for (int k = 0; k < i; k++) t -= Li[k] * beta[k];
+    beta[i] = t / Li[i];
+  }
+  for (int i = n - 1; i >= 0; i--) {
+    double t = beta[i];
+    for (int k = i + 1; k < n; k++) t -= G[static_cast<size_t>(k) * n + i] * beta[k];
+    beta[i] = t / G[static_cast<size_t>(i) * n + i];
+  }
+  for (int i = 0; i < active; i++) {
+    const int ii = J[i];
+    const double* x = data.row(ii);
+    double t = 0.0;
+    for (int k = 0; k < n; k++) t += x[k] * beta[k];
+    o[ii] = t;
+  }
+  return 1;
+}
+
 int CGLS(const AlgIn& data, const double lambda, const int cgitermax,
          const double epsilon, const int* J, int active,
          double* beta, double* o,
@@ -341,8 +413,11 @@ int L2_SVM_MFN(const AlgIn& data, const options& Options,
     }
     memcpy(w_bar, w, sizeof(double)*static_cast<std::size_t>(n));
     memcpy(o_bar, o, sizeof(double)*static_cast<std::size_t>(m));
-    opt = CGLS(data, lambda, cgitermax, epsilon, activeSet, active, w_bar,
-               o_bar, cpos, cneg, workspace);
+    opt = Options.directSolve
+              ? directLeastSquares(data, lambda, activeSet, active, w_bar,
+                                   o_bar, cpos, cneg, workspace)
+              : CGLS(data, lambda, cgitermax, epsilon, activeSet, active,
+                     w_bar, o_bar, cpos, cneg, workspace);
     // outputs of the inactive examples, which CGLS did not update
     scoreRows(activeSet + active, m - active, data, n0, w_bar, o_bar);
     if (ini == 0) {

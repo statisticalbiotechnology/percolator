@@ -64,7 +64,9 @@ struct options {
     double epsilon; /* all tolerances */
     int cgitermax; /* max iterations for CGLS */
     int mfnitermax; /* max iterations for L2_SVM_MFN */
-
+    /* solve the least squares problems exactly (normal equations) instead
+       of iteratively with CGLS */
+    bool directSolve = false;
 };
 
 class Delta { /* used in line search */
@@ -87,6 +89,7 @@ struct SolverWorkspace {
   SolverWorkspace(int m, int n);
   std::vector<double> z, q, r, p;
   std::vector<Delta> deltas;
+  std::vector<double> gram;  /* n x n, for the direct solve */
 };
 
 /* svmlin algorithms and their subroutines */
