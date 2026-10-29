@@ -5,10 +5,11 @@
 #include <random>
 #include <sstream>
 
-void TmpDir::createTempFile(std::string& tcf, std::string& tcd) {
+#include "MyException.h"
+
+TmpDir::TmpDir() {
   namespace fs = std::filesystem;
   try {
-    // a new directory with a random name in the system's temporary directory
     std::random_device seed;
     std::mt19937_64 generator(seed());
     fs::path dir;
@@ -17,9 +18,14 @@ void TmpDir::createTempFile(std::string& tcf, std::string& tcd) {
       name << "percolator-" << std::hex << generator();
       dir = fs::temp_directory_path() / name.str();
     } while (!fs::create_directory(dir));
-    tcd = dir.string();
-    tcf = (dir / "converters-tmp.tcb").string();
+    path_ = dir.string();
   } catch (fs::filesystem_error& e) {
-    std::cerr << e.what() << std::endl;
+    throw MyException(std::string("ERROR: Could not create a temporary "
+                                  "directory: ") + e.what() + "\n");
   }
+}
+
+TmpDir::~TmpDir() {
+  std::error_code ec;  // never throw from a destructor
+  std::filesystem::remove_all(path_, ec);
 }

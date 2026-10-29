@@ -1056,8 +1056,9 @@ int Caller::run() {
     inputFN_ = inputFNs_.at(0);
   } else if (inputFNs_.size() > 1) {
     tabInput_ = true;
+    tmpDir_ = std::make_unique<TmpDir>();
     ValidateTabFile validateTab;
-    inputFN_ = validateTab.concatenateMultiplePINs(inputFNs_);
+    inputFN_ = validateTab.concatenateMultiplePINs(inputFNs_, tmpDir_->getPath());
   }
 
   int success = 0;
