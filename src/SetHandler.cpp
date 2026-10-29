@@ -231,7 +231,8 @@ void SetHandler::readPSMs(istream& dataStream, std::string& psmLine,
   } else if (maxPSMs_ > 0u) { // reservoir sampling to create subset of size maxPSMs_
     std::priority_queue<PSMDescriptionPriority> subsetPSMs;
     // ScanId -> (priority, isDecoy)
-    std::map<ScanId, std::pair<size_t, bool> > scanIdLookUp;
+    std::unordered_map<ScanId, std::pair<size_t, bool>, ScanIdHash>
+        scanIdLookUp;
     unsigned int upperLimit = UINT_MAX;
     do {
       if (lineNr % 1000000 == 0 && VERB > 1) {
@@ -243,15 +244,15 @@ void SetHandler::readPSMs(istream& dataStream, std::string& psmLine,
       ScanId scanId = getScanId(psmLine, label, optionalFields, lineNr);
       bool isDecoy = (label == -1);
       size_t randIdx;
-      if (scanIdLookUp.find(scanId) != scanIdLookUp.end()) {
-        if (concatenatedSearch && isDecoy != scanIdLookUp[scanId].second) {
+      auto lookUp = scanIdLookUp.find(scanId);
+      if (lookUp != scanIdLookUp.end()) {
+        if (concatenatedSearch && isDecoy != lookUp->second.second) {
           concatenatedSearch = false;
         }
-        randIdx = scanIdLookUp[scanId].first;
+        randIdx = lookUp->second.first;
       } else {
         randIdx = PseudoRandom::lcg_rand();
-        scanIdLookUp[scanId].first = randIdx;
-        scanIdLookUp[scanId].second = isDecoy;
+        scanIdLookUp.emplace(scanId, std::make_pair(randIdx, isDecoy));
       }
       
       if (subsetPSMs.size() < maxPSMs_ || randIdx < upperLimit) {
@@ -274,7 +275,8 @@ void SetHandler::readPSMs(istream& dataStream, std::string& psmLine,
     
     addQueueToSets(subsetPSMs, targetSet, decoySet);
   } else { // simply read all PSMs
-    std::map<ScanId, bool> scanIdLookUp; // ScanId -> isDecoy
+    // ScanId -> isDecoy, only needed until a separate search is detected
+    std::unordered_map<ScanId, bool, ScanIdHash> scanIdLookUp;
     do {
       if (lineNr % 1000000 == 0 && VERB > 1) {
         std::cerr << "Reading line " << lineNr << std::endl;
@@ -283,12 +285,12 @@ void SetHandler::readPSMs(istream& dataStream, std::string& psmLine,
       int label = 0;
       ScanId scanId = getScanId(psmLine, label, optionalFields, lineNr);
       bool isDecoy = (label == -1);
-      if (scanIdLookUp.find(scanId) != scanIdLookUp.end()) {
-        if (concatenatedSearch && isDecoy != scanIdLookUp[scanId]) {
+      if (concatenatedSearch) {
+        auto inserted = scanIdLookUp.emplace(scanId, isDecoy);
+        if (!inserted.second && isDecoy != inserted.first->second) {
           concatenatedSearch = false;
+          scanIdLookUp.clear();
         }
-      } else {
-        scanIdLookUp[scanId] = isDecoy;
       }
       if (label == 1) {
         targetSet->readPsm(psmLine, lineNr, optionalFields, featurePool_, decoyPrefix_);

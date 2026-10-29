@@ -31,7 +31,6 @@
 #include <random>
 
 #include "Scores.h"
-#include "ResultHolder.h"
 #include "Globals.h"
 #include "PSMDescription.h"
 #include "FeatureNames.h"
@@ -74,10 +73,11 @@ class DataSet {
   
   void readPsm(const std::string& line, const unsigned int lineNr,
                const std::vector<OptionalField>& optionalFields, 
-               FeatureMemoryPool& featurePool, std::string decoyPrefix);
+               FeatureMemoryPool& featurePool, const std::string& decoyPrefix);
   static LabelType readPsm(const std::string& line, const unsigned int lineNr,
     const std::vector<OptionalField>& optionalFields, bool readProteins,
-    PSMDescription*& myPsm, FeatureMemoryPool& featurePool, std::string decoyPrefix);
+    PSMDescription*& myPsm, FeatureMemoryPool& featurePool,
+    const std::string& decoyPrefix);
   
   void registerPsm(PSMDescription* myPsm);
   

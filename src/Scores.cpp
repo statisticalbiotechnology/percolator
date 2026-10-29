@@ -121,19 +121,19 @@ void Scores::print(LabelType label, std::ostream& os) {
 
   for (; scoreIt != scores_.end(); ++scoreIt) {
     if (scoreIt->label == label) {
-      std::ostringstream out;
-      scoreIt->pPSM->printProteins(out);
-      ResultHolder rh(scoreIt->score, scoreIt->q, scoreIt->pep,
-                      scoreIt->pPSM->getId(), scoreIt->pPSM->getFullPeptide(),
-                      out.str(), scoreIt->pPSM->getSpectrumFileName());
-      if (is_output_rt_) {
-        rh.retentionTime = scoreIt->pPSM->getRetentionTime();
-        rh.outputRT =
-            true;  // Ideally this should be set once outside this loop, but
-                   // ResultHolder needs to be initialized before.
+      PSMDescription* psm = scoreIt->pPSM;
+      os << psm->getId() << '\t';
+      const std::string& fileName = psm->getSpectrumFileName();
+      if (!fileName.empty()) {
+        os << fileName << '\t';
       }
-
-      os << rh << std::endl;
+      os << scoreIt->score << '\t' << scoreIt->q << '\t' << scoreIt->pep << '\t'
+         << psm->getFullPeptide() << '\t';
+      psm->printProteins(os);
+      if (is_output_rt_) {
+        os << '\t' << psm->getRetentionTime();
+      }
+      os << '\n';
     }
   }
 }

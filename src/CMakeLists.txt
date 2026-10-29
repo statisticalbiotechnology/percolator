@@ -165,7 +165,7 @@ endif()
 # COMPILE PERCOLATOR
 ###############################################################################
 
-add_library(perclibrary STATIC BaseSpline.cpp MassHandler.cpp ResultHolder.cpp PSMDescription.cpp MonotoneRegressor.cpp IsotonicPEP.cpp
+add_library(perclibrary STATIC BaseSpline.cpp MassHandler.cpp PSMDescription.cpp MonotoneRegressor.cpp IsotonicPEP.cpp
 								  SetHandler.cpp StdvNormalizer.cpp svm.cpp Caller.cpp CompositionSorter.cpp CrossValidation.cpp Enzyme.cpp Globals.cpp NoNormalizer.cpp Normalizer.cpp
 								  SanityCheck.cpp UniNormalizer.cpp DataSet.cpp TabFileValidator.cpp FeatureNames.cpp LogisticRegression.cpp Numerical.cpp Option.cpp PosteriorEstimator.cpp
 								  ProteinProbEstimator.cpp ProteinFDRestimator.cpp Scores.cpp PseudoRandom.cpp Set.cpp SqtSanityCheck.cpp ssl.cpp PackedVector.cpp

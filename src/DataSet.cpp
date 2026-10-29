@@ -50,7 +50,7 @@ bool DataSet::writeTabData(ofstream& out) {
     }
     out << '\t' << psm->getFullPeptide() << '\t';
     psm->printProteins(out);
-    out << endl;
+    out << '\n';
   }
   return true;
 }
@@ -99,7 +99,7 @@ void DataSet::fillFeatures(std::vector<double*>& features) {
  */
 void DataSet::readPsm(const std::string& line, const unsigned int lineNr,
     const std::vector<OptionalField>& optionalFields, FeatureMemoryPool& featurePool,
-    std::string decoyPrefix) { 
+    const std::string& decoyPrefix) {
   PSMDescription* myPsm = NULL;
   bool readProteins = true;
   readPsm(line, lineNr, optionalFields, readProteins, myPsm, featurePool, decoyPrefix);
@@ -108,7 +108,8 @@ void DataSet::readPsm(const std::string& line, const unsigned int lineNr,
 
 LabelType DataSet::readPsm(const std::string& line, const unsigned int lineNr,
     const std::vector<OptionalField>& optionalFields, bool readProteins,
-    PSMDescription*& myPsm, FeatureMemoryPool& featurePool, std::string decoyPrefix) {
+    PSMDescription*& myPsm, FeatureMemoryPool& featurePool,
+    const std::string& decoyPrefix) {
   TabReader reader(line);
   std::string tmp;
   
@@ -185,8 +186,8 @@ LabelType DataSet::readPsm(const std::string& line, const unsigned int lineNr,
     throw MyException(temp.str());
   }
   
-  std::string peptide_seq = reader.readString();
-  myPsm->setPeptide(peptide_seq);
+  myPsm->setPeptide(reader.readString());
+  const std::string& peptide_seq = myPsm->getFullPeptide();
   if (reader.error()) {
     ostringstream temp;
     temp << "ERROR: Reading tab file, error reading PSM " << myPsm->getId() 
@@ -213,18 +214,17 @@ LabelType DataSet::readPsm(const std::string& line, const unsigned int lineNr,
     if (PSMDescription::getProteinNameSeparator() == "\t") {
       while (!reader.error()) {
         std::string tmp = reader.readString();
-        if (tmp.size() > 0) proteins.push_back(tmp);
+        if (tmp.size() > 0) proteins.push_back(std::move(tmp));
       }
     } else {
-      std::string names = reader.readString();
-      size_t pos = 0;
-      std::string token;
-      while ((pos = names.find(PSMDescription::getProteinNameSeparator())) != std::string::npos) {
-        token = names.substr(0, pos);
-        if (token.size() > 0) proteins.push_back(token);
-        names.erase(0, pos + PSMDescription::getProteinNameSeparator().length());
+      const std::string names = reader.readString();
+      const std::string& separator = PSMDescription::getProteinNameSeparator();
+      size_t start = 0, pos = 0;
+      while ((pos = names.find(separator, start)) != std::string::npos) {
+        if (pos > start) proteins.push_back(names.substr(start, pos - start));
+        start = pos + separator.length();
       }
-      if (names.size() > 0) proteins.push_back(names);
+      if (start < names.size()) proteins.push_back(names.substr(start));
 
       // check if end of line was reached after reading the protein string
       // if this is not the case, it means the user probably incorrectly provided proteins as a tab separated input
@@ -245,10 +245,10 @@ LabelType DataSet::readPsm(const std::string& line, const unsigned int lineNr,
     proteins.swap(myPsm->proteinIds); // shrink to fit
   }
 
-  if (label == LabelType::DECOY) {
+  if (label == LabelType::DECOY && VERB > 1 && !decoyWarningTripped_) {
     for (auto const& proteinId: myPsm->proteinIds) { 
       bool startsWithDecoyPrefix = (proteinId.rfind(decoyPrefix, 0) == 0);
-      if (!startsWithDecoyPrefix && VERB > 1 && !decoyWarningTripped_) {
+      if (!startsWithDecoyPrefix && !decoyWarningTripped_) {
         std::cerr << "Warning: protein decoy prefix " << decoyPrefix 
                   << " doesn't match the decoy protein identifier " 
                   << proteinId << "." << std::endl;

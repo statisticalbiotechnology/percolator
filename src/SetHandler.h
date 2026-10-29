@@ -25,6 +25,7 @@
 #include <algorithm>
 #include <functional>
 #include <map>
+#include <unordered_map>
 #include <vector>
 #include <string>
 #include <cctype>
@@ -32,7 +33,6 @@
 #include <queue>
 #include <climits>
 
-#include "ResultHolder.h"
 #include "DataSet.h"
 #include "Normalizer.h"
 #include "Scores.h"
@@ -56,6 +56,13 @@ struct PSMDescriptionPriority {
 * ScanId is a tuple of (ScanNr, ExpMass).
 */
 typedef std::pair<int, double> ScanId;
+
+struct ScanIdHash {
+  size_t operator()(const ScanId& scanId) const {
+    return std::hash<int>()(scanId.first) ^
+           (std::hash<double>()(scanId.second) << 1);
+  }
+};
 
 /*
 * SetHandler is a class that provides functionality to handle training,

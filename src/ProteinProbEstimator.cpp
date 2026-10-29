@@ -454,7 +454,7 @@ void ProteinProbEstimator::print(ostream& myout, bool decoy) {
           myout << peptIt->name << " ";
         }
       }
-      myout << std::endl;
+      myout << '\n';
     }
   }
 }

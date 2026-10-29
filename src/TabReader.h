@@ -18,6 +18,7 @@
 #define TABREADER_H_
 
 #include <string>
+#include <charconv>
 #include <climits>
 #include <cstring>
 #include <cmath>
@@ -25,7 +26,8 @@
 // using char pointers is much faster than istringstream
 class TabReader {
  public:
-  TabReader(const std::string& line) : f_(line.c_str()), err(0) {
+  TabReader(const std::string& line)
+      : f_(line.c_str()), end_(line.c_str() + line.size()), err(0) {
     errno = 0;
   }
   
@@ -51,6 +53,21 @@ class TabReader {
   }
   
   double readDouble() {
+#if defined(__cpp_lib_to_chars)
+    // std::from_chars rounds correctly like strtod but is much faster. Any
+    // input it does not fully accept (leading '+' or whitespace, hex,
+    // out-of-range values, trailing garbage) takes the strtod path below, so
+    // results and error handling are unchanged.
+    {
+      double d;
+      std::from_chars_result res = std::from_chars(f_, end_, d);
+      if (res.ec == std::errc() && res.ptr != f_ &&
+          (*res.ptr == '\0' || isspace(static_cast<unsigned char>(*res.ptr)))) {
+        advance(res.ptr);
+        return d;
+      }
+    }
+#endif
     char* next = NULL;
     errno = 0;
     double d = strtod(f_, &next);
@@ -89,6 +106,7 @@ class TabReader {
   bool error() { return err != 0; }
  private:
   const char* f_;
+  const char* end_;
   int err;
 };
 

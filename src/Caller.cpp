@@ -1037,6 +1037,13 @@ int Caller::run() {
       std::min((unsigned int)omp_get_max_threads(), numThreads_)));
 #endif
 
+  // The protein decoy prefix is only used for protein inference, and
+  // detecting it costs an extra pass over the input.
+  if (!ProteinProbEstimator::getCalcProteinLevelProb() &&
+      protEstimatorDecoyPrefix_ == "auto") {
+    protEstimatorDecoyPrefix_ = "";
+  }
+
   /* Validate tab file and get decoy prefix */
   TabFileValidator tabFileValidator;
   {
