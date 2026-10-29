@@ -40,10 +40,7 @@ limitations under the License.
 #include "Scores.h"
 #include "SetHandler.h"
 
-#define NO_BOOST_DATE_TIME_INLINE
 #include <algorithm>
-#include <boost/asio.hpp>
-#include <boost/functional/hash_fwd.hpp>
 
 /*
  * Main class that starts and controls the calculations.

@@ -1,7 +1,6 @@
-#include <boost/filesystem.hpp>
-#include <iostream>
+#include <string>
 
-class TmpDir {       
-  public:             
+class TmpDir {
+  public:
     void static createTempFile(std::string& tcf, std::string& tcd);
 };

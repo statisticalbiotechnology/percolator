@@ -31,15 +31,12 @@ endif()
 
 
 
-# Make find_package honor UPPER-CASE <PKG>_ROOT vars like BOOST_ROOT (CMake 3.30+)
+# Make find_package honor UPPER-CASE <PKG>_ROOT variables (CMake 3.30+)
 if(POLICY CMP0074)
   cmake_policy(SET CMP0074 NEW)
 endif()
 if(POLICY CMP0144)
   cmake_policy(SET CMP0144 NEW)
-endif()
-if(POLICY CMP0167)
-  cmake_policy(SET CMP0167 OLD)
 endif()
 if(POLICY CMP0169)
   cmake_policy(SET CMP0169 NEW)
@@ -49,39 +46,6 @@ if(POLICY CMP0177)
 endif()
 
 
-
-# --- Boost configuration (platform-aware) ---
-# Windows needs static Boost to match the CRT. Linux and macOS use shared libs
-# (macOS Homebrew ships shared-only; Linux distros vary but shared is always present).
-if(MSVC)
-  set(Boost_USE_STATIC_LIBS ON)
-else()
-  set(Boost_USE_STATIC_LIBS OFF)
-endif()
-set(Boost_USE_MULTITHREADED ON)
-
-# Prefer Boost's classic FindBoost over boost-cmake configs
-set(Boost_NO_BOOST_CMAKE ON CACHE BOOL "" FORCE)
-
-# Require the components you actually use
-if(APPLE)
-  find_package(Boost ${BOOST_MIN_VERSION} COMPONENTS filesystem REQUIRED)
-else()
-  find_package(Boost ${BOOST_MIN_VERSION} COMPONENTS filesystem system REQUIRED)
-endif()
-
-add_definitions(-DBOOST_SYSTEM_NO_DEPRECATED)
-add_definitions(-DBOOST_ERROR_CODE_HEADER_ONLY)
-
-if(WIN32)
-  add_definitions(-DBOOST_ALL_NO_LIB) # disable autolinking in boost
-endif()
-
-include_directories(${Boost_INCLUDE_DIRS})
-list(APPEND COMMON_LIBRARIES Boost::filesystem)
-if(NOT APPLE)
-  list(APPEND COMMON_LIBRARIES Boost::system)
-endif()
 
 if(MSVC)
   add_definitions (/MP /D _CRT_SECURE_NO_WARNINGS /D _CRT_NONSTDC_NO_DEPRECATE)
@@ -94,7 +58,6 @@ if (MSVC AND USE_MSVC_STATIC_RUNTIME)
       string(REPLACE "/MD" "/MT" ${flag_var} "${${flag_var}}")
     endif()
   endforeach()
-  set(Boost_USE_STATIC_RUNTIME ON)  # match Boost to the CRT choice
 endif()
 
 find_package(Threads REQUIRED)

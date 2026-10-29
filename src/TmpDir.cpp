@@ -1,21 +1,25 @@
 #include "TmpDir.h"
 
+#include <filesystem>
+#include <iostream>
+#include <random>
+#include <sstream>
+
 void TmpDir::createTempFile(std::string& tcf, std::string& tcd) {
-  //TODO it would be nice to somehow avoid these declararions and therefore avoid the linking to
-  //boost filesystem when we don't use them      
+  namespace fs = std::filesystem;
   try {
-          boost::filesystem::path ph = boost::filesystem::unique_path();
-          boost::filesystem::path dir = boost::filesystem::temp_directory_path() / ph;
-          boost::filesystem::path file("converters-tmp.tcb");
-          tcf = std::string((dir / file).string());
-          tcd = dir.string();
-          if (boost::filesystem::is_directory(dir)) {
-            boost::filesystem::remove_all(dir);
-          }
-
-          boost::filesystem::create_directory(dir);
-        } catch (boost::filesystem::filesystem_error &e) {
-          std::cerr << e.what() << std::endl;
-        }
+    // a new directory with a random name in the system's temporary directory
+    std::random_device seed;
+    std::mt19937_64 generator(seed());
+    fs::path dir;
+    do {
+      std::ostringstream name;
+      name << "percolator-" << std::hex << generator();
+      dir = fs::temp_directory_path() / name.str();
+    } while (!fs::create_directory(dir));
+    tcd = dir.string();
+    tcf = (dir / "converters-tmp.tcb").string();
+  } catch (fs::filesystem_error& e) {
+    std::cerr << e.what() << std::endl;
+  }
 }
-

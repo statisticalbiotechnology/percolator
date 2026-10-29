@@ -45,16 +45,6 @@ if(NOT Eigen3_FOUND)
 endif()
 
 # =============================
-# Find Boost
-# =============================
-find_package(Boost ${BOOST_MIN_VERSION} REQUIRED)
-add_definitions(-DBOOST_SYSTEM_NO_DEPRECATED)
-add_definitions(-DBOOST_ERROR_CODE_HEADER_ONLY)
-if(WIN32)
-    add_definitions(-DBOOST_ALL_NO_LIB)
-endif()
-
-# =============================
 # Add test executable
 # =============================
 add_executable(gtest_unit
@@ -74,7 +64,6 @@ add_executable(gtest_unit
 # =============================
 target_include_directories(gtest_unit
   PRIVATE
-    ${Boost_INCLUDE_DIRS}
     ${PERCOLATOR_SOURCE_DIR}/src
     ${CMAKE_BINARY_DIR}/src
 )

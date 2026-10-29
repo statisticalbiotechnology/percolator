@@ -32,7 +32,6 @@
 #include "CompositionSorter.h"
 #include "CrossValidation.h"
 #include "DataSet.h"
-#include "Analytics.h"
 #include "MyException.h"
 #include "Option.h"
 #include "PickedProteinInterface.h"
@@ -338,8 +337,10 @@ bool Caller::parseOptions(int argc, char** argv) {
       "inside protein IDs will be replaced by semicolons. Not available for "
       "Fido.",
       "", TRUE_IF_SET);
-  cmd.defineOption("", "no-analytics", "Switch off analytics reporting.", "",
-                   TRUE_IF_SET);
+  cmd.defineOption("", "no-analytics",
+                   "No effect, kept for compatibility. Percolator does not "
+                   "report analytics.",
+                   "", TRUE_IF_SET);
   /* EXPERIMENTAL FLAGS: no long term support, flag names might be subject to
    * change and behavior */
   cmd.defineOption(Option::EXPERIMENTAL_FEATURE, "num-threads",
@@ -1029,9 +1030,6 @@ int Caller::run() {
   if (VERB > 0) {
     std::cerr << extendedGreeter();
   }
-// skip for now
-//  if (analytics_)
-//    postToPostHog("percolator_startup");
 #ifdef _OPENMP
   omp_set_num_threads(static_cast<int>(
       std::min((unsigned int)omp_get_max_threads(), numThreads_)));
