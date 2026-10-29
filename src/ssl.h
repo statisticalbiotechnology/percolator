@@ -81,8 +81,10 @@ class Delta { /* used in line search */
     int index;
     int s;
 };
+// a total order, so that the line search does not depend on the sorting
+// algorithm
 inline bool operator<(const Delta& a, const Delta& b) {
-  return (a.delta < b.delta);
+  return a.delta < b.delta || (a.delta == b.delta && a.index < b.index);
 }
 
 struct SolverWorkspace {

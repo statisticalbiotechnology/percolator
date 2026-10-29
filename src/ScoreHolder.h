@@ -55,15 +55,21 @@ class ScoreHolder {
   inline PSMDescription* getPSM() const { return pPSM; }
 };
 
-/* Orders by score, then scan, experimental mass and label. Inlined because
-   they are the comparators of the large sorts. */
+/* Orders by score, then scan, experimental mass, label, spectrum file and
+   PSM id. The comparators of all sorts are total orders, so that the result
+   does not depend on the sorting algorithm, which with GCC's parallel mode
+   depends on the number of threads. Inlined because they are the
+   comparators of the large sorts. */
 inline bool operator>(const ScoreHolder& one, const ScoreHolder& other) {
   if (one.score != other.score) return one.score > other.score;
   if (one.pPSM->scan != other.pPSM->scan)
     return one.pPSM->scan > other.pPSM->scan;
   if (one.pPSM->expMass != other.pPSM->expMass)
     return one.pPSM->expMass > other.pPSM->expMass;
-  return one.label > other.label;
+  if (one.label != other.label) return one.label > other.label;
+  if (one.pPSM->specFileNr != other.pPSM->specFileNr)
+    return one.pPSM->specFileNr > other.pPSM->specFileNr;
+  return one.pPSM->getId() > other.pPSM->getId();
 }
 
 inline bool operator<(const ScoreHolder& one, const ScoreHolder& other) {
@@ -72,7 +78,10 @@ inline bool operator<(const ScoreHolder& one, const ScoreHolder& other) {
     return one.pPSM->scan < other.pPSM->scan;
   if (one.pPSM->expMass != other.pPSM->expMass)
     return one.pPSM->expMass < other.pPSM->expMass;
-  return one.label < other.label;
+  if (one.label != other.label) return one.label < other.label;
+  if (one.pPSM->specFileNr != other.pPSM->specFileNr)
+    return one.pPSM->specFileNr < other.pPSM->specFileNr;
+  return one.pPSM->getId() < other.pPSM->getId();
 }
 
 struct lexicOrderProb {
@@ -96,8 +105,10 @@ struct lexicOrderProb {
   bool operator()(const ScoreHolder& x, const ScoreHolder& y) const {
     int peptCmp = compStrIt(x.pPSM->getPeptideSequenceView(),
                             y.pPSM->getPeptideSequenceView());
-    return ((peptCmp == 1) || ((peptCmp == 0) && (x.label > y.label)) ||
-            ((peptCmp == 0) && (x.label == y.label) && (x.score > y.score)));
+    if (peptCmp != 0) return peptCmp == 1;
+    if (x.label != y.label) return x.label > y.label;
+    if (x.score != y.score) return x.score > y.score;
+    return x.pPSM->getId() < y.pPSM->getId();
   }
 };
 
@@ -125,7 +136,12 @@ struct OrderScanHash {
                     (fast_uint_hash(x.pPSM->scan) << 1);
     size_t hash_y = fast_uint_hash(y.pPSM->specFileNr) ^
                     (fast_uint_hash(y.pPSM->scan) << 1);
-    return hash_x < hash_y;
+    if (hash_x != hash_y) return hash_x < hash_y;
+    if (x.pPSM->specFileNr != y.pPSM->specFileNr)
+      return x.pPSM->specFileNr < y.pPSM->specFileNr;
+    if (x.pPSM->scan != y.pPSM->scan) return x.pPSM->scan < y.pPSM->scan;
+    if (x.label != y.label) return x.label > y.label;
+    return x.pPSM->getId() < y.pPSM->getId();
   }
 };
 
@@ -137,7 +153,10 @@ struct OrderScanMassCharge {
       return x.pPSM->scan < y.pPSM->scan;
     if (x.pPSM->expMass != y.pPSM->expMass)
       return x.pPSM->expMass < y.pPSM->expMass;
-    return x.score > y.score;
+    if (x.score != y.score) return x.score > y.score;
+    // a decoy wins a tie in target-decoy competition
+    if (x.label != y.label) return x.label < y.label;
+    return x.pPSM->getId() < y.pPSM->getId();
   }
 };
 
@@ -147,7 +166,10 @@ struct OrderScanLabel {
       return x.pPSM->specFileNr < y.pPSM->specFileNr;
     if (x.pPSM->scan != y.pPSM->scan)
       return x.pPSM->scan < y.pPSM->scan;
-    return x.label > y.label;
+    if (x.label != y.label) return x.label > y.label;
+    // the best-scoring PSM of a spectrum first
+    if (x.score != y.score) return x.score > y.score;
+    return x.pPSM->getId() < y.pPSM->getId();
   }
 };
 
