@@ -107,21 +107,109 @@ double cglsFun1(int active, int* J, const double* Y,
   return(omega_q);
 }
 
+/* r += z[i] * x_i for one row of set2, like the reference BLAS daxpy,
+   which skips the row when z[i] is zero. */
+static inline void addScaledRow(double zi, const double* x, int n, double* r) {
+  if (zi != 0.0) {
+    for (int k = 0; k < n; k++) {
+      r[k] += zi * x[k];
+    }
+  }
+}
+
 void cglsFun2(int active, int* J, const double* Y,
               double* set2, int n0, int n, double* q, 
               double* o, double* z, double* r, 
               double cpos, double cneg){
-  int i;
-  int inc = 1;
-  
-  for (i = 0; i < active; i++) {
+  int i = 0;
+  // Rows are added to r four at a time, in the same order per element as
+  // one daxpy per row, so that r is loaded and stored once per four rows.
+  for (; i + 4 <= active; i += 4) {
+    for (int j = i; j < i + 4; j++) {
+      o[J[j]] += q[j];
+      z[j] -= ((Y[J[j]]==1)? cpos : cneg) * q[j];
+    }
+    const double* x0 = set2 + static_cast<size_t>(i) * static_cast<size_t>(n);
+    const double* x1 = x0 + n;
+    const double* x2 = x1 + n;
+    const double* x3 = x2 + n;
+    const double z0 = z[i], z1 = z[i + 1], z2 = z[i + 2], z3 = z[i + 3];
+    if (z0 != 0.0 && z1 != 0.0 && z2 != 0.0 && z3 != 0.0) {
+      for (int k = 0; k < n; k++) {
+        double rk = r[k];
+        rk += z0 * x0[k];
+        rk += z1 * x1[k];
+        rk += z2 * x2[k];
+        rk += z3 * x3[k];
+        r[k] = rk;
+      }
+    } else {
+      addScaledRow(z0, x0, n, r);
+      addScaledRow(z1, x1, n, r);
+      addScaledRow(z2, x2, n, r);
+      addScaledRow(z3, x3, n, r);
+    }
+  }
+  for (; i < active; i++) {
     o[J[i]] += q[i];
     z[i] -= ((Y[J[i]]==1)? cpos : cneg) * q[i];
-    daxpy_(&n, &(z[i]),
-           set2 + static_cast<size_t>(i) * static_cast<size_t>(n), &inc, r,
-           &inc);
+    addScaledRow(z[i],
+                 set2 + static_cast<size_t>(i) * static_cast<size_t>(n), n, r);
   }
 }
+
+/* Dot product with the same summation order as the reference BLAS ddot:
+   blocks of five products are summed before they are added. */
+#define DDOT_BLOCK(x, y, i)                                         \
+  ((x)[i] * (y)[i] + (x)[(i) + 1] * (y)[(i) + 1] +                  \
+   (x)[(i) + 2] * (y)[(i) + 2] + (x)[(i) + 3] * (y)[(i) + 3] +      \
+   (x)[(i) + 4] * (y)[(i) + 4])
+
+/* o[rows[i]] = x_{rows[i]}' w + w[n0] for the given rows, where x has n0
+   features and w[n0] is the intercept. Same result as one ddot per row, but
+   four rows are processed together so that their additions and memory
+   loads overlap. */
+static void scoreRows(const int* rows, int numRows, double** set, int n0,
+                      const double* w, double* o) {
+  int i = 0;
+  for (; i + 4 <= numRows; i += 4) {
+    const double* x0 = set[rows[i]];
+    const double* x1 = set[rows[i + 1]];
+    const double* x2 = set[rows[i + 2]];
+    const double* x3 = set[rows[i + 3]];
+    double t0 = 0.0, t1 = 0.0, t2 = 0.0, t3 = 0.0;
+    int k = 0;
+    for (; k < n0 - 4; k += 5) {
+      t0 += DDOT_BLOCK(x0, w, k);
+      t1 += DDOT_BLOCK(x1, w, k);
+      t2 += DDOT_BLOCK(x2, w, k);
+      t3 += DDOT_BLOCK(x3, w, k);
+    }
+    for (; k < n0; k++) {
+      t0 += x0[k] * w[k];
+      t1 += x1[k] * w[k];
+      t2 += x2[k] * w[k];
+      t3 += x3[k] * w[k];
+    }
+    o[rows[i]] = t0 + w[n0];
+    o[rows[i + 1]] = t1 + w[n0];
+    o[rows[i + 2]] = t2 + w[n0];
+    o[rows[i + 3]] = t3 + w[n0];
+  }
+  for (; i < numRows; i++) {
+    const double* x = set[rows[i]];
+    double t = 0.0;
+    int k = 0;
+    for (; k < n0 - 4; k += 5) {
+      t += DDOT_BLOCK(x, w, k);
+    }
+    for (; k < n0; k++) {
+      t += x[k] * w[k];
+    }
+    o[rows[i]] = t + w[n0];
+  }
+}
+#undef DDOT_BLOCK
 
 int CGLS(const AlgIn& data, const double lambda, const int cgitermax,
          const double epsilon, const vector_int& Subset,
@@ -290,10 +378,8 @@ int L2_SVM_MFN(const AlgIn& data, options& Options,
                ActiveSubset,
                Weights_bar,
                Outputs_bar, cpos, cneg, workspace);
-    for (int i = active; i < m; i++) {
-      ii = ActiveSubset.vec[i];
-      o_bar[ii] = ddot_(&n0, set[ii], &inc, w_bar, &inc) + w_bar[n - 1];
-    }
+    // outputs of the inactive examples, which CGLS did not update
+    scoreRows(ActiveSubset.vec + active, m - active, set, n0, w_bar, o_bar);
     if (ini == 0) {
       cgitermax = CGITERMAX;
       ini = 1;
