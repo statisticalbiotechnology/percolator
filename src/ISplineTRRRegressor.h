@@ -26,192 +26,97 @@ struct QuadraticModel {
   double c;
 };
 
-struct CostGrad {
-  double f;
-  VectorXd g;
-};
-
-inline CostGrad costGrad(const QuadraticModel& q, const VectorXd& x) {
-  const VectorXd Gx = q.G * x;
-  CostGrad cg;
-  cg.f = x.dot(Gx) - 2.0 * q.h.dot(x) + q.c;
-  cg.g = 2.0 * (Gx - q.h);
-  return cg;
-}
-
-// Identify the "free" set: variables not at a bound OR where the gradient points interior
-inline std::vector<int> freeSet(const VectorXd& x, const VectorXd& g,
-                                const VectorXd& lb, const VectorXd& ub, double tol = 1e-12) {
-  std::vector<int> F;
-  F.reserve(x.size());
-  for (int i = 0; i < x.size(); ++i) {
-    bool atL = std::abs(x[i] - lb[i]) <= tol, atU = std::abs(x[i] - ub[i]) <= tol;
-    bool moveIn = (!atL && !atU) || (atL && g[i] < 0.0) || (atU && g[i] > 0.0);
-    if (moveIn) F.push_back(i);
-  }
-  return F;
-}
-
-// Steihaug–Toint truncated CG: solve (H)p = -g on free vars, with ||p|| <= Delta
-struct TRStep { VectorXd p; double pred_red; bool hit_boundary; };
-
-inline TRStep steihaugCG(const MatrixXd& H,
-                  const VectorXd& x,
-                  const VectorXd& g,
-                  const std::vector<int>& F,
-                  double Delta) {
-  // Work only on free coordinates via views.
-  auto Hmul = [&](const VectorXd& vF) {
-    // Build a full vector v with zeros outside F, apply H, then extract F.
-    VectorXd v = VectorXd::Zero(x.size());
-    for (int k = 0; k < (int)F.size(); ++k) v[F[k]] = vF[k];
-    VectorXd Hv = H * v;
-    VectorXd out(vF.size());
-    for (int k = 0; k < (int)F.size(); ++k) out[k] = Hv[F[k]];
-    return out;
-  };
-  // Gradient on free set: gF
-  VectorXd gF(F.size());
-  for (int k = 0; k < (int)F.size(); ++k) gF[k] = g[F[k]];
-
-  // CG init
-  VectorXd pF = VectorXd::Zero(F.size());
-  VectorXd rCG = -gF;                  // residual
-  VectorXd d = rCG;                    // search direction
-  double rr = rCG.squaredNorm();
-  bool hit_boundary = false;
-
-  const double eps = 1e-12;
-  const int max_cg_iters = static_cast<int>(F.size());
-  for (int cg_iter = 0; cg_iter < max_cg_iters && rr > eps; ++cg_iter) {
-    VectorXd Hd = Hmul(d);
-    double dHd = d.dot(Hd);
-    if (dHd <= 0) {
-      // Non-positive curvature, step to boundary
-      // Solve ||pF + tau d|| = Delta  for tau > 0
-      double a = d.squaredNorm();
-      double bq = 2.0 * pF.dot(d);
-      double c = pF.squaredNorm() - Delta * Delta;
-      double tau = (-bq + std::sqrt(std::max(0.0, bq*bq - 4*a*c))) / (2*a);
-      pF = pF + tau * d;
-      hit_boundary = true;
-      break;
-    }
-    double alpha = rr / dHd;
-    VectorXd pTrial = pF + alpha * d;
-    if (pTrial.norm() >= Delta) {
-      // Intersect with trust-region boundary
-      double a = d.squaredNorm();
-      double bq = 2.0 * pF.dot(d);
-      double c = pF.squaredNorm() - Delta * Delta;
-      double tau = (-bq + std::sqrt(std::max(0.0, bq*bq - 4*a*c))) / (2*a);
-      pF = pF + tau * d;
-      hit_boundary = true;
-      break;
-    }
-    // Regular CG step
-    pF = pTrial;
-    VectorXd rCG_new = rCG - alpha * Hd;
-    double rr_new = rCG_new.squaredNorm();
-    double beta = rr_new / rr;
-    d = rCG_new + beta * d;
-    rCG = rCG_new;
-    rr = rr_new;
-  }
-
-  // Predicted reduction: -g_F^T pF - 0.5 pF^T H pF
-  VectorXd HpF = Hmul(pF);
-  double pred = -gF.dot(pF) - 0.5 * pF.dot(HpF);
-
-  // Lift pF back to full space
-  VectorXd p = VectorXd::Zero(x.size());
-  for (int k = 0; k < (int)F.size(); ++k) p[F[k]] = pF[k];
-  return {p, pred, hit_boundary};
-}
-
-// Reflect/clamp to bounds along step p; return alpha in (0,1] that hits first bound
-inline double stepToBox(const VectorXd& x, const VectorXd& p,
-                        const VectorXd& lb, const VectorXd& ub) {
-  double alpha = 1.0;
-  for (int i = 0; i < x.size(); ++i) {
-    if (p[i] > 0.0) alpha = std::min(alpha, (ub[i] - x[i]) / p[i]);
-    else if (p[i] < 0.0) alpha = std::min(alpha, (lb[i] - x[i]) / p[i]);
-  }
-  return std::max(0.0, alpha);
-}
-
-// Top-level TRR solver
-struct TRROpts {
-  double Delta0 = 1.0;
-  double DeltaMax = 1e6;
-  double eta = 1e-3;     // accept if rho >= eta
-  double gtol = 1e-8;    // projected gradient tolerance (inf-norm)
-  int max_iters = 200;
-};
-
-struct TRRResult {
+// Solves x'Gx - 2h'x = min subject to lb <= x <= ub for a symmetric
+// positive definite G with a primal active-set method. Each iteration
+// minimises exactly over the free variables (Cholesky), moves towards that
+// minimum until a bound blocks, or, when nothing blocks, releases the bound
+// variable whose gradient points furthest into the box. For a strictly
+// convex problem this ends at the exact optimum after a finite number of
+// iterations.
+struct BoxQPResult {
   VectorXd x;
   double fval;
   int iters;
   bool converged;
 };
 
-inline TRRResult trr_boxed_qp(const QuadraticModel& q,
-                       const VectorXd& lb,
-                       const VectorXd& ub,
-                       VectorXd x0,
-                       const TRROpts& opts = {}) {
-  VectorXd x = x0; projectToBox(x, lb, ub);
-  double Delta = opts.Delta0;
-  const MatrixXd H = 2.0 * q.G;
-
-  auto proj_grad_inf = [&](const VectorXd& x, const VectorXd& g) {
-    double normInf = 0.0;
-    for (int i = 0; i < x.size(); ++i) {
-      double gi = g[i];
-      if      (x[i] <= lb[i] + 1e-12) gi = std::min(0.0, gi); // cannot go below lb
-      else if (x[i] >= ub[i] - 1e-12) gi = std::max(0.0, gi); // cannot go above ub
-      normInf = std::max(normInf, std::abs(gi));
+inline BoxQPResult solveBoxQP(const QuadraticModel& q, const VectorXd& lb,
+                              const VectorXd& ub, VectorXd x) {
+  const int p = static_cast<int>(x.size());
+  projectToBox(x, lb, ub);
+  std::vector<char> atBound(p);
+  for (int i = 0; i < p; ++i) atBound[i] = (x[i] == lb[i] || x[i] == ub[i]);
+  const int maxIters = 10 * p + 100;
+  int it = 0;
+  bool converged = false;
+  for (; it < maxIters; ++it) {
+    std::vector<int> F;
+    for (int i = 0; i < p; ++i) {
+      if (!atBound[i]) F.push_back(i);
     }
-    return normInf;
-  };
-
-  for (int it = 0; it < opts.max_iters; ++it) {
-    CostGrad cg = costGrad(q, x);
-    if (proj_grad_inf(x, cg.g) < opts.gtol)
-      return {x, cg.f, it, true};
-
-    // Free set and TR subproblem
-    auto F = freeSet(x, cg.g, lb, ub);
-    if (F.empty()) return {x, cg.f, it, true}; // stuck at KKT on bounds
-
-    TRStep st = steihaugCG(H, x, cg.g, F, Delta);
-    if (st.p.norm() == 0.0) return {x, cg.f, it, true};
-
-    // Respect bounds by clamping along p
-    double alphaBox = stepToBox(x, st.p, lb, ub);
-    VectorXd x_trial = x + alphaBox * st.p;
-
-    // Actual & predicted reduction
-    double f_old = cg.f;
-    double f_new = costGrad(q, x_trial).f;
-    double ared = f_old - f_new;
-    VectorXd s = alphaBox * st.p;
-    double pred = -(cg.g.dot(s) + 0.5 * s.dot(H * s));
-    double rho = (pred > 0.0) ? (ared / pred) : -std::numeric_limits<double>::infinity();
-
-    // Update trust region
-    if (rho < 0.25) Delta *= 0.25;
-    else if (rho > 0.75 && std::abs(alphaBox - 1.0) < 1e-12 && st.hit_boundary)
-      Delta = std::min(2.0 * Delta, opts.DeltaMax);
-
-    // Accept/reject
-    if (rho >= opts.eta) x = x_trial; // accept
-    // else reject and keep x, with smaller Delta
+    const int m = static_cast<int>(F.size());
+    // minimum over the free variables, with the bound variables fixed
+    MatrixXd GFF(m, m);
+    VectorXd rhs(m);
+    for (int a = 0; a < m; ++a) {
+      double t = q.h[F[a]];
+      for (int j = 0; j < p; ++j) {
+        if (atBound[j]) t -= q.G(F[a], j) * x[j];
+      }
+      rhs[a] = t;
+      for (int c = 0; c < m; ++c) GFF(a, c) = q.G(F[a], F[c]);
+    }
+    VectorXd xF(m);
+    if (m > 0) {
+      Eigen::LLT<MatrixXd> llt(GFF);
+      if (llt.info() != Eigen::Success) break;
+      xF = llt.solve(rhs);
+    }
+    // move towards it until the first bound blocks
+    double alpha = 1.0;
+    int blocking = -1;
+    for (int a = 0; a < m; ++a) {
+      const int i = F[a];
+      const double step = xF[a] - x[i];
+      if (step < 0.0 && xF[a] < lb[i]) {
+        const double r = (lb[i] - x[i]) / step;
+        if (r < alpha) { alpha = r; blocking = i; }
+      } else if (step > 0.0 && xF[a] > ub[i]) {
+        const double r = (ub[i] - x[i]) / step;
+        if (r < alpha) { alpha = r; blocking = i; }
+      }
+    }
+    for (int a = 0; a < m; ++a) {
+      const int i = F[a];
+      x[i] = (alpha == 1.0) ? xF[a] : x[i] + alpha * (xF[a] - x[i]);
+    }
+    if (blocking >= 0) {
+      x[blocking] = (x[blocking] - lb[blocking] < ub[blocking] - x[blocking])
+                        ? lb[blocking] : ub[blocking];
+      atBound[blocking] = 1;
+      continue;
+    }
+    // optimal on the free set; check the bound variables
+    const VectorXd Gx = q.G * x;
+    int release = -1;
+    double mostInward = 1e-12;
+    for (int i = 0; i < p; ++i) {
+      if (!atBound[i]) continue;
+      const double g = 2.0 * (Gx[i] - q.h[i]);
+      const double inward = (x[i] == lb[i]) ? -g : g;
+      if (inward > mostInward) {
+        mostInward = inward;
+        release = i;
+      }
+    }
+    if (release < 0) {
+      converged = true;
+      break;
+    }
+    atBound[release] = 0;
   }
-
-  CostGrad cg_end = costGrad(q, x);
-  return {x, cg_end.f, opts.max_iters, false};
+  const double fval = x.dot(q.G * x) - 2.0 * q.h.dot(x) + q.c;
+  return {x, fval, it, converged};
 }
 
 namespace ispline_detail {
@@ -451,9 +356,7 @@ public:
     if (params_.intercept_col >= 0 && params_.intercept_col < p)
       lb[params_.intercept_col] = -std::numeric_limits<double>::infinity();
 
-    Eigen::VectorXd x0 = Eigen::VectorXd::Zero(p);
-    TRROpts opts; opts.Delta0 = 1.0; opts.gtol = 1e-8; opts.max_iters = 1000;
-    TRRResult sol = trr_boxed_qp(q, lb, ub, x0, opts);
+    BoxQPResult sol = solveBoxQP(q, lb, ub, Eigen::VectorXd::Zero(p));
     // Predict + clamp
     std::vector<double> yhat(n);
     for (int i = 0; i < n; ++i) {
