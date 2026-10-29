@@ -80,7 +80,7 @@ static void activeRowsTimesVector(int active, const int* J, const AlgIn& data,
   }
 }
 
-double cglsFun1(int active, int* J, const double* Y,
+double cglsFun1(int active, const int* J, const double* Y,
                 const AlgIn& data, double* q,
                 double* p, double cpos, double cneg){
   double omega_q = 0.0;
@@ -105,7 +105,7 @@ static inline void addScaledRow(double zi, const double* x, int n, double* r) {
   }
 }
 
-void cglsFun2(int active, int* J, const double* Y,
+void cglsFun2(int active, const int* J, const double* Y,
               const AlgIn& data, double* q,
               double* o, double* z, double* r, 
               double cpos, double cneg){
@@ -200,20 +200,16 @@ static void scoreRows(const int* rows, int numRows, const AlgIn& data, int n0,
 #undef DDOT_BLOCK
 
 int CGLS(const AlgIn& data, const double lambda, const int cgitermax,
-         const double epsilon, const vector_int& Subset,
-         vector_double& Weights, vector_double& Outputs,
+         const double epsilon, const int* J, int active,
+         double* beta, double* o,
          double cpos, double cneg, SolverWorkspace& workspace) {
   if (VERBOSE_CGLS) {
     cout << "CGLS starting..." << endl;
   }
   /* Disassemble the structures */
   Timer tictoc;
-  int active = Subset.d;
-  int* J = Subset.vec;
   const double* Y = data.Y.data();
   int n = data.n;
-  double* beta = Weights.vec;
-  double* o = Outputs.vec;
   // initialize z
   double* z = workspace.z.data();
   double* q = workspace.q.data();
@@ -288,28 +284,28 @@ int CGLS(const AlgIn& data, const double lambda, const int cgitermax,
   return optimality;
 }
 
-int L2_SVM_MFN(const AlgIn& data, options& Options,
-               vector_double& Weights,
-               vector_double& Outputs, double cpos, double cneg) {
+int L2_SVM_MFN(const AlgIn& data, const options& Options,
+               std::vector<double>& Weights,
+               std::vector<double>& Outputs, double cpos, double cneg) {
   /* Disassemble the structures */
   Timer tictoc;
   const double* Y = data.Y.data();
-  int n = Weights.d;
+  int n = static_cast<int>(Weights.size());
   const int m = data.m;
   double lambda = Options.lambda;
   double epsilon = BIG_EPSILON;
   int cgitermax = SMALL_CGITERMAX;
-  double* w = Weights.vec;
-  double* o = Outputs.vec;
+  double* w = Weights.data();
+  double* o = Outputs.data();
   double F_old = 0.0;
   double F = 0.0;
   double diff = 0.0;
   int ini = 0;
   int n0 = n-1;
   int inc = 1;
-  vector_int ActiveSubset;
-  ActiveSubset.vec = new int[m];
-  ActiveSubset.d = m;
+  // active examples first, inactive ones from the back
+  std::vector<int> activeSubset(static_cast<size_t>(m));
+  int* activeSet = activeSubset.data();
   // initialize
   F = 0.5 * lambda * ddot_(&n, w, &inc, w, &inc);
   int active = 0;
@@ -317,27 +313,22 @@ int L2_SVM_MFN(const AlgIn& data, options& Options,
   for (int i = 0; i < m; i++) {
     diff = 1 - Y[i] * o[i];
     if (diff > 0) {
-      ActiveSubset.vec[active] = i;
+      activeSet[active] = i;
       active++;
       // C[i]
       F += 0.5 * ((Y[i]==1)? cpos : cneg) * diff * diff;
     } else {
-      ActiveSubset.vec[inactive] = i;
+      activeSet[inactive] = i;
       inactive--;
     }
   }
-  ActiveSubset.d = active;
   int iter = 0;
   int opt = 0;
   int opt2 = 0;
-  vector_double Weights_bar;
-  vector_double Outputs_bar;
-  double* w_bar = new double[static_cast<std::size_t>(n)];
-  double* o_bar = new double[static_cast<std::size_t>(m)];
-  Weights_bar.vec = w_bar;
-  Outputs_bar.vec = o_bar;
-  Weights_bar.d = n;
-  Outputs_bar.d = m;
+  std::vector<double> weightsBar(static_cast<size_t>(n));
+  std::vector<double> outputsBar(static_cast<size_t>(m));
+  double* w_bar = weightsBar.data();
+  double* o_bar = outputsBar.data();
   double delta = 0.0;
   int ii = 0;
   SolverWorkspace workspace(m, n);
@@ -350,22 +341,17 @@ int L2_SVM_MFN(const AlgIn& data, options& Options,
     }
     memcpy(w_bar, w, sizeof(double)*static_cast<std::size_t>(n));
     memcpy(o_bar, o, sizeof(double)*static_cast<std::size_t>(m));
-    opt = CGLS(data,
-               lambda,
-               cgitermax,
-               epsilon,
-               ActiveSubset,
-               Weights_bar,
-               Outputs_bar, cpos, cneg, workspace);
+    opt = CGLS(data, lambda, cgitermax, epsilon, activeSet, active, w_bar,
+               o_bar, cpos, cneg, workspace);
     // outputs of the inactive examples, which CGLS did not update
-    scoreRows(ActiveSubset.vec + active, m - active, data, n0, w_bar, o_bar);
+    scoreRows(activeSet + active, m - active, data, n0, w_bar, o_bar);
     if (ini == 0) {
       cgitermax = CGITERMAX;
       ini = 1;
     };
     opt2 = 1;
     for (int i = 0; i < m; i++) {
-      ii = ActiveSubset.vec[i];
+      ii = activeSet[i];
       if (i < active) {
         opt2 = (opt2 && (Y[ii] * o_bar[ii] <= 1 + epsilon));
       } else {
@@ -409,16 +395,15 @@ int L2_SVM_MFN(const AlgIn& data, options& Options,
       o[i] += delta * (o_bar[i] - o[i]);
       diff = 1 - Y[i] * o[i];
       if (diff > 0) {
-        ActiveSubset.vec[active] = i;
+        activeSet[active] = i;
         active++;
         F += 0.5 * ((Y[i]==1)? cpos : cneg) * diff * diff;
       } else {
-        ActiveSubset.vec[inactive] = i;
+        activeSet[inactive] = i;
         inactive--;
       }
     }
-    ActiveSubset.d = active;
-    if (fabs(F - F_old) < RELATIVE_STOP_EPS * fabs(F_old)) {
+      if (fabs(F - F_old) < RELATIVE_STOP_EPS * fabs(F_old)) {
       return 2;
     }
   }

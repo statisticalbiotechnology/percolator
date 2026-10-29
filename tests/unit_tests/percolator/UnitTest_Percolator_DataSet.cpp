@@ -122,3 +122,28 @@ TEST_F(DataSetTest, CheckOptionalFieldsParsing)
     EXPECT_THROW(DataSet::readPsm("Id\t-1\t2.5\t4I2\tPEPTIDE\tProteinList",
             1, optionalFields, true, myPsm, featurePool, decoyPrefix), MyException);
 }
+
+// The feature pool can be destroyed and created again with another row
+// width, and then hands out distinct, writable rows.
+TEST(FeatureMemoryPoolTest, ReuseAfterDestroy)
+{
+    FeatureMemoryPool pool;
+    pool.createPool(3);
+    double* row = pool.allocate();
+    row[0] = row[1] = row[2] = 1.0;
+    pool.deallocate(row);
+    EXPECT_EQ(row, pool.allocate());  // freed rows are reused
+    pool.destroyPool();
+    EXPECT_FALSE(pool.isInitialized());
+
+    const size_t width = 7, numRows = 200000;  // more than one block
+    pool.createPool(width);
+    std::vector<double*> rows;
+    for (size_t i = 0; i < numRows; ++i) {
+        rows.push_back(pool.allocate());
+        for (size_t j = 0; j < width; ++j) rows.back()[j] = static_cast<double>(i);
+    }
+    for (size_t i = 0; i < numRows; ++i) {
+        for (size_t j = 0; j < width; ++j) ASSERT_EQ(static_cast<double>(i), rows[i][j]);
+    }
+}

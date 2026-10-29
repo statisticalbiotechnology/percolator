@@ -78,8 +78,8 @@ TEST_F(SetHandlerTest, TestSubsetStoring)
     pos->setLabel(LabelType::TARGET);
     neg->setLabel(LabelType::DECOY);
     DeletionTracker::reset();
-    sh.push_back_dataset(pos);
-    sh.push_back_dataset(neg);
+    sh.push_back_dataset(std::unique_ptr<DataSet>(pos));
+    sh.push_back_dataset(std::unique_ptr<DataSet>(neg));
     EXPECT_EQ(0, DeletionTracker::deletionCount);
     EXPECT_EQ(pos, sh.getSubsetFromLabel(LabelType::TARGET));
     EXPECT_EQ(neg, sh.getSubsetFromLabel(LabelType::DECOY));

@@ -25,14 +25,10 @@ void FeatureMemoryPool::createPool(size_t numFeatures) {
 
 void FeatureMemoryPool::createNewBlock() {
   // every row is completely written by its user, so no zero-initialization
-  double* memStart = new double[numFeatures_ * numRowsPerBlock_];
-  memStarts_.push_back(memStart);
+  memStarts_.emplace_back(new double[numFeatures_ * numRowsPerBlock_]);
 }
 
 void FeatureMemoryPool::destroyPool() {
-  for (size_t i = 0; i < memStarts_.size(); ++i) {
-    delete[] memStarts_.at(i);
-  }
   memStarts_.clear();
   freeRows_.clear();
   initializedRows_ = 0;
@@ -40,7 +36,7 @@ void FeatureMemoryPool::destroyPool() {
 }
 
 double* FeatureMemoryPool::addressFromIdx(unsigned int i) const {
-  return memStarts_.at(i / numRowsPerBlock_) + (i % numRowsPerBlock_) * numFeatures_;
+  return memStarts_.at(i / numRowsPerBlock_).get() + (i % numRowsPerBlock_) * numFeatures_;
 }
 
 double* FeatureMemoryPool::allocate() {

@@ -194,8 +194,8 @@ TEST_F(ScoresTest, CheckPopulating)
         psm->scan = 105 + i;
         set2->registerPsm(psm);
     }
-    setHandler.push_back_dataset(set1);
-    setHandler.push_back_dataset(set2);
+    setHandler.push_back_dataset(std::unique_ptr<DataSet>(set1));
+    setHandler.push_back_dataset(std::unique_ptr<DataSet>(set2));
 
     scores.populateWithPSMs(setHandler);
     ASSERT_EQ(10, scores.size());
@@ -218,8 +218,8 @@ TEST_F(ScoresTest, CheckPopulatingEmpty)
     DataSet *set2 = new DataSet();
     set1->setLabel(LabelType::TARGET);
     set2->setLabel(LabelType::DECOY);
-    setHandler.push_back_dataset(set1);
-    setHandler.push_back_dataset(set2);
+    setHandler.push_back_dataset(std::unique_ptr<DataSet>(set1));
+    setHandler.push_back_dataset(std::unique_ptr<DataSet>(set2));
     EXPECT_THROW(scores.populateWithPSMs(setHandler), MyException);
 }
 

@@ -48,8 +48,8 @@ class DataSet {
  public:
   DataSet();
   virtual ~DataSet();
-  
-  void initFeatureTables(const unsigned int numFeatures);
+  DataSet(const DataSet&) = delete;
+  DataSet& operator=(const DataSet&) = delete;
   
   void inline setLabel(LabelType l) { label_ = l; }
   LabelType inline getLabel() const { return label_; }
@@ -82,8 +82,8 @@ class DataSet {
   
  protected:   
   
-  std::vector<PSMDescription*> psms_;
-  LabelType label_;
+  std::vector<PSMDescription*> psms_;  // owned
+  LabelType label_ = LabelType::UNDEFINED;
   
   static FeatureNames featureNames_;
   static bool decoyWarningTripped_;

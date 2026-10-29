@@ -127,8 +127,8 @@ TEST_F(CrossValidationTest, doStepTest)
         psm->scan = scanNumber++;
         decoys->registerPsm(psm);
     }
-    setHandler.push_back_dataset(targets);
-    setHandler.push_back_dataset(decoys);
+    setHandler.push_back_dataset(std::unique_ptr<DataSet>(targets));
+    setHandler.push_back_dataset(std::unique_ptr<DataSet>(decoys));
 
     Normalizer *pNorm = NULL;
     setHandler.normalizeFeatures(pNorm);

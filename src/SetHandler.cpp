@@ -27,20 +27,15 @@ SetHandler::~SetHandler() {
  * Frees the feature rows of all PSMs, which are only needed for training.
  */
 void SetHandler::releaseFeatures() {
-  for (DataSet* subset : subsets_) {
+  for (const auto& subset : subsets_) {
     subset->clearFeaturePointers();
   }
   featurePool_.destroyPool();
 }
 
 void SetHandler::reset() {
-  for (unsigned int ix = 0; ix < subsets_.size(); ix++) {
-    if (subsets_[ix] != NULL) {
-      delete subsets_[ix];
-    }
-    subsets_[ix] = NULL;
-  }
   subsets_.clear();
+  featurePool_.destroyPool();
   DataSet::resetFeatureNames();
 }
 /**
@@ -58,11 +53,11 @@ unsigned int SetHandler::getSubsetIndexFromLabel(LabelType label) {
 }
 
 /**
- * Insert DataSet object into this SetHandler
- * @param ds pointer to DataSet to be inserted
+ * Insert DataSet object into this SetHandler, which takes ownership
+ * @param ds DataSet to be inserted
  */
-void SetHandler::push_back_dataset( DataSet * ds ) {
-  subsets_.push_back(ds);
+void SetHandler::push_back_dataset(std::unique_ptr<DataSet> ds) {
+  subsets_.push_back(std::move(ds));
 }
 
 void SetHandler::populateScoresWithPSMs(vector<ScoreHolder> &scores, LabelType label) {
@@ -211,20 +206,18 @@ void SetHandler::writeTab(const string& dataFN, SanityCheck * pCheck) {
     }
     dataStream << std::endl;
   }
-  for (std::vector<DataSet*>::iterator it = subsets_.begin();
-         it != subsets_.end(); ++it) {
-    (*it)->writeTabData(dataStream);
+  for (const auto& subset : subsets_) {
+    subset->writeTabData(dataStream);
   }
 }
 
 void SetHandler::readPSMs(istream& dataStream, std::string& psmLine, 
     bool hasInitialValueRow, bool& concatenatedSearch,
     std::vector<OptionalField>& optionalFields) {
-  DataSet* targetSet = new DataSet();
-  assert(targetSet);
+  // owned here until reading succeeded
+  std::unique_ptr<DataSet> targetSet(new DataSet());
   targetSet->setLabel(LabelType::TARGET);
-  DataSet* decoySet = new DataSet();
-  assert(decoySet);
+  std::unique_ptr<DataSet> decoySet(new DataSet());
   decoySet->setLabel(LabelType::DECOY);
   
   unsigned int lineNr = (hasInitialValueRow ? 3u : 2u);
@@ -283,7 +276,7 @@ void SetHandler::readPSMs(istream& dataStream, std::string& psmLine,
       ++lineNr;
     } while (getline(dataStream, psmLine));
     
-    addQueueToSets(subsetPSMs, targetSet, decoySet);
+    addQueueToSets(subsetPSMs, targetSet.get(), decoySet.get());
   } else { // simply read all PSMs
     // ScanId -> isDecoy, only needed until a separate search is detected
     std::unordered_map<ScanId, bool, ScanIdHash> scanIdLookUp;
@@ -318,8 +311,8 @@ void SetHandler::readPSMs(istream& dataStream, std::string& psmLine,
     std::cerr << "Found " << lineNr - (hasInitialValueRow ? 3u : 2u) << " PSMs" << std::endl;
   }
   
-  push_back_dataset(targetSet);
-  push_back_dataset(decoySet);
+  push_back_dataset(std::move(targetSet));
+  push_back_dataset(std::move(decoySet));
 }
 
 void SetHandler::addQueueToSets(

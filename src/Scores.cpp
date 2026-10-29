@@ -93,6 +93,7 @@ void Scores::scoreAndAddPSM(ScoreHolder& sh,
   sh.score += rawWeights[numFeatures];
 
   featurePool.deallocate(sh.pPSM->features);
+  sh.pPSM->features = NULL;
   sh.pPSM->deleteRetentionFeatures();
 
   if (sh.isTarget()) {

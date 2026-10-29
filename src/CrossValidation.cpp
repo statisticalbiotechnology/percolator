@@ -19,9 +19,9 @@
 #include "PosteriorEstimator.h"
 #include "Timer.h"
 
+#include <algorithm>
 #ifdef _OPENMP
 #include <omp.h>
-#include <algorithm>
 #endif
 // checks cross validation convergence in case of quickValidation_
 const double CrossValidation::requiredIncreaseOver2Iterations_ = 0.01;
@@ -368,38 +368,19 @@ int CrossValidation::doStep(const Normalizer* pNorm, double selectionFdr) {
  * @param svmInput training data for this particular nested CV fold
  */
 void CrossValidation::trainCpCnPair(CandidateCposCfrac& cpCnFold,
-                                    options& pOptions,
+                                    const options& pOptions,
                                     const AlgIn& svmInput) {
-  vector_double pWeights;
-  pWeights.d = static_cast<int>(FeatureNames::getNumFeatures()) + 1;
-  pWeights.vec = new double[pWeights.d];
-
   double cpos = cpCnFold.cpos;
   double cfrac = cpCnFold.cfrac;
-
-  // Create storage vector for SVM algorithm
-  vector_double Outputs;
-  size_t numInputs =
-      static_cast<std::size_t>(svmInput.positives + svmInput.negatives);
-  Outputs.vec = new double[numInputs];
-  Outputs.d = static_cast<int>(numInputs);
 
   if (VERB > 3)
     cerr << "- cross-validation with Cpos=" << cpos << ", Cneg=" << cfrac * cpos
          << endl;
-  for (int ix = 0; ix < pWeights.d; ix++) {
-    pWeights.vec[ix] = 0;
-  }
-  for (int ix = 0; ix < Outputs.d; ix++) {
-    Outputs.vec[ix] = 0;
-  }
-
-  // Call SVM algorithm (see ssl.cpp)
-  L2_SVM_MFN(svmInput, pOptions, pWeights, Outputs, cpos, cfrac * cpos);
-
-  for (std::size_t i = FeatureNames::getNumFeatures() + 1; i--;) {
-    cpCnFold.ww[i] = pWeights.vec[i];
-  }
+  // the SVM algorithm (see ssl.cpp) starts from zero weights and outputs
+  std::fill(cpCnFold.ww.begin(), cpCnFold.ww.end(), 0.0);
+  std::vector<double> outputs(
+      static_cast<std::size_t>(svmInput.positives + svmInput.negatives), 0.0);
+  L2_SVM_MFN(svmInput, pOptions, cpCnFold.ww, outputs, cpos, cfrac * cpos);
 }
 
 /**
@@ -412,7 +393,7 @@ void CrossValidation::trainCpCnPair(CandidateCposCfrac& cpCnFold,
  */
 int CrossValidation::mergeCpCnPairs(
     double selectionFdr,
-    options& pOptions,
+    const options& pOptions,
     vector<vector<Scores> >& nestedTestScoresVec,
     const vector<double>& cposCandidates,
     const vector<double>& cfracCandidates) {
@@ -508,35 +489,18 @@ int CrossValidation::mergeCpCnPairs(
   if (nestedXvalBins_ > 1) {
 #pragma omp parallel for schedule(dynamic, 1) ordered
     for (int set = 0; set < static_cast<int>(numFolds_); ++set) {
-      vector_double pWeights;
-      pWeights.d = static_cast<int>(FeatureNames::getNumFeatures()) + 1;
-      pWeights.vec = new double[pWeights.d];
-
       AlgIn& svmInput = svmInputs_[set * nestedXvalBins_];
       trainScores_[set].generateNegativeTrainingSet(svmInput, 1.0);
       trainScores_[set].generatePositiveTrainingSet(svmInput, selectionFdr,
                                                     1.0, trainBestPositive_);
 
-      // Create storage vector for SVM algorithm
-      vector_double Outputs;
-      size_t numInputs =
-          static_cast<std::size_t>(svmInput.positives + svmInput.negatives);
-      Outputs.vec = new double[numInputs];
-      Outputs.d = static_cast<int>(numInputs);
-
-      for (int ix = 0; ix < pWeights.d; ix++) {
-        pWeights.vec[ix] = 0;
-      }
-      for (int ix = 0; ix < Outputs.d; ix++) {
-        Outputs.vec[ix] = 0;
-      }
-      // Call SVM algorithm (see ssl.cpp)
-      L2_SVM_MFN(svmInput, pOptions, pWeights, Outputs, bestCposes[set],
+      // the SVM algorithm (see ssl.cpp) starts from zero weights and outputs
+      std::fill(weights_[set].begin(), weights_[set].end(), 0.0);
+      std::vector<double> outputs(
+          static_cast<std::size_t>(svmInput.positives + svmInput.negatives),
+          0.0);
+      L2_SVM_MFN(svmInput, pOptions, weights_[set], outputs, bestCposes[set],
                  bestCposes[set] * bestCfracs[set]);
-
-      for (std::size_t i = FeatureNames::getNumFeatures() + 1; i--;) {
-        weights_[set][i] = pWeights.vec[i];
-      }
     }
   }
 

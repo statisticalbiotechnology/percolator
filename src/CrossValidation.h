@@ -123,11 +123,11 @@ class CrossValidation {
 
   void initializeGridSearch(double targetDecoySizeRatio);
   void trainCpCnPair(CandidateCposCfrac& cpCnFold,
-                     options& pOptions,
+                     const options& pOptions,
                      const AlgIn& svmInput);
 
   int mergeCpCnPairs(double selectionFdr,
-                     options& pOptions,
+                     const options& pOptions,
                      std::vector<std::vector<Scores> >& nestedTestScoresVec,
                      const vector<double>& cpos_vec,
                      const vector<double>& cfrac_vec);

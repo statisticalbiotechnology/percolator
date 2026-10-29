@@ -19,6 +19,7 @@
 
 /* Adapted from https://www.thinkmind.org/download.php?articleid=computation_tools_2012_1_10_80006 */
 
+#include <memory>
 #include <vector>
 #include <iostream>
 
@@ -26,14 +27,15 @@ class FeatureMemoryPool {
  private:
    static const unsigned int kBlockSize = 1u << 20; // in number of doubles, e.g. 8MB if sizeof(double) = 8
    unsigned int numRowsPerBlock_, numFeatures_, initializedRows_;
-   std::vector<double*> memStarts_;
+   std::vector<std::unique_ptr<double[]> > memStarts_;
    std::vector<double*> freeRows_;
    bool isInitialized_;
  public:
   FeatureMemoryPool() : numRowsPerBlock_(0), numFeatures_(0), 
                         initializedRows_(0), isInitialized_(false) {}
 
-  ~FeatureMemoryPool() { destroyPool(); }
+  FeatureMemoryPool(const FeatureMemoryPool&) = delete;
+  FeatureMemoryPool& operator=(const FeatureMemoryPool&) = delete;
 
   void createPool(size_t numFeatures);
   void createNewBlock();

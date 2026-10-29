@@ -25,6 +25,7 @@
 #include <algorithm>
 #include <functional>
 #include <map>
+#include <memory>
 #include <unordered_map>
 #include <vector>
 #include <string>
@@ -73,8 +74,10 @@ class SetHandler {
  public:
   SetHandler(unsigned int maxPSMs);
   virtual ~SetHandler();
+  SetHandler(const SetHandler&) = delete;
+  SetHandler& operator=(const SetHandler&) = delete;
 
-  void push_back_dataset(DataSet* ds);
+  void push_back_dataset(std::unique_ptr<DataSet> ds);
 
   void setDecoyPrefix(std::string& decoyPrefix) { decoyPrefix_ = decoyPrefix; }
 
@@ -99,12 +102,10 @@ class SetHandler {
     return static_cast<int>(subsets_[getSubsetIndexFromLabel(label)]->getSize());
   }
   
-  inline DataSet* getSubset(unsigned int ix) { return (subsets_[ix]); }
+  inline DataSet* getSubset(unsigned int ix) { return subsets_[ix].get(); }
   inline DataSet* getSubsetFromLabel(LabelType label) {
-    return (subsets_[getSubsetIndexFromLabel(label)]);
+    return subsets_[getSubsetIndexFromLabel(label)].get();
   }
-  
-  static void deletePSMPointer(PSMDescription* psm);
   
   FeatureMemoryPool& getFeaturePool() { return featurePool_; }
   
@@ -113,7 +114,7 @@ class SetHandler {
 
  protected:
   size_t maxPSMs_;
-  std::vector<DataSet*> subsets_;
+  std::vector<std::unique_ptr<DataSet> > subsets_;
   FeatureMemoryPool featurePool_;
   std::string decoyPrefix_; // Used to determine if a psm is a decoy
   
