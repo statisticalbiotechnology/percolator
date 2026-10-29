@@ -60,6 +60,14 @@ class ScoreHolder {
    does not depend on the sorting algorithm, which with GCC's parallel mode
    depends on the number of threads. Inlined because they are the
    comparators of the large sorts. */
+// Last tie-break of the orders below: the PSM id, then the input line, so
+// that duplicated input rows also sort the same way on any number of threads.
+inline int compareIdAndLine(const PSMDescription& x, const PSMDescription& y) {
+  int idCmp = x.getId().compare(y.getId());
+  if (idCmp != 0) return idCmp;
+  return (x.getLineNr() > y.getLineNr()) - (x.getLineNr() < y.getLineNr());
+}
+
 inline bool operator>(const ScoreHolder& one, const ScoreHolder& other) {
   if (one.score != other.score) return one.score > other.score;
   if (one.pPSM->scan != other.pPSM->scan)
@@ -69,7 +77,7 @@ inline bool operator>(const ScoreHolder& one, const ScoreHolder& other) {
   if (one.label != other.label) return one.label > other.label;
   if (one.pPSM->specFileNr != other.pPSM->specFileNr)
     return one.pPSM->specFileNr > other.pPSM->specFileNr;
-  return one.pPSM->getId() > other.pPSM->getId();
+  return compareIdAndLine(*one.pPSM, *other.pPSM) > 0;
 }
 
 inline bool operator<(const ScoreHolder& one, const ScoreHolder& other) {
@@ -81,7 +89,7 @@ inline bool operator<(const ScoreHolder& one, const ScoreHolder& other) {
   if (one.label != other.label) return one.label < other.label;
   if (one.pPSM->specFileNr != other.pPSM->specFileNr)
     return one.pPSM->specFileNr < other.pPSM->specFileNr;
-  return one.pPSM->getId() < other.pPSM->getId();
+  return compareIdAndLine(*one.pPSM, *other.pPSM) < 0;
 }
 
 struct lexicOrderProb {
@@ -108,7 +116,7 @@ struct lexicOrderProb {
     if (peptCmp != 0) return peptCmp == 1;
     if (x.label != y.label) return x.label > y.label;
     if (x.score != y.score) return x.score > y.score;
-    return x.pPSM->getId() < y.pPSM->getId();
+    return compareIdAndLine(*x.pPSM, *y.pPSM) < 0;
   }
 };
 
@@ -141,7 +149,7 @@ struct OrderScanHash {
       return x.pPSM->specFileNr < y.pPSM->specFileNr;
     if (x.pPSM->scan != y.pPSM->scan) return x.pPSM->scan < y.pPSM->scan;
     if (x.label != y.label) return x.label > y.label;
-    return x.pPSM->getId() < y.pPSM->getId();
+    return compareIdAndLine(*x.pPSM, *y.pPSM) < 0;
   }
 };
 
@@ -156,7 +164,7 @@ struct OrderScanMassCharge {
     if (x.score != y.score) return x.score > y.score;
     // a decoy wins a tie in target-decoy competition
     if (x.label != y.label) return x.label < y.label;
-    return x.pPSM->getId() < y.pPSM->getId();
+    return compareIdAndLine(*x.pPSM, *y.pPSM) < 0;
   }
 };
 
@@ -169,7 +177,7 @@ struct OrderScanLabel {
     if (x.label != y.label) return x.label > y.label;
     // the best-scoring PSM of a spectrum first
     if (x.score != y.score) return x.score > y.score;
-    return x.pPSM->getId() < y.pPSM->getId();
+    return compareIdAndLine(*x.pPSM, *y.pPSM) < 0;
   }
 };
 

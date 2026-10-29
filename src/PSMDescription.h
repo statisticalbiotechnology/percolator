@@ -147,6 +147,10 @@ class PSMDescription {
     }
     inline double getRetentionTime() const { return retentionTime_; }
 
+    // line of the PSM in the input, used as the last tie-break when sorting
+    inline void setLineNr(unsigned int lineNr) { lineNr_ = lineNr; }
+    inline unsigned int getLineNr() const { return lineNr_; }
+
     double* features = NULL;  // owned by a FeatureMemoryPool instance, no need to delete
     double expMass = 0.0, calcMass = 0.0;
     double retentionTime_ = std::numeric_limits<double>::quiet_NaN();
@@ -158,6 +162,7 @@ class PSMDescription {
     std::string_view peptide;
     const std::string* const* proteins_ = nullptr;
     unsigned int numProteins_ = 0u;
+    unsigned int lineNr_ = 0u;  // fills the padding after numProteins_
     static std::string proteinNameSeparator_;
     static vector<std::string> spectraFileNames_;
     static size_t lastSpectrumFileIndex_;

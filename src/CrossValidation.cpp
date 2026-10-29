@@ -560,7 +560,8 @@ int CrossValidation::mergeCpCnPairs(
         trainScores_[set].calcScoresAndQvals(weights_[set], testFdr_);
   }
   trainScoresCurrent_ = true;
-  return static_cast<int>(bestTruePos / (numFolds_ - 1));
+  // each PSM is in numFolds_ - 1 training sets, or in the only one
+  return static_cast<int>(bestTruePos / std::max(1u, numFolds_ - 1));
 }
 
 void CrossValidation::postIterationProcessing(Scores& fullset,

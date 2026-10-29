@@ -1096,12 +1096,15 @@ int Caller::run() {
       // From Algorithm S3 of the percolator-RESET supplementary material
       // decoyFractionTraining - the probability of assigning a decoy to the
       // training set
-      std::for_each(allScores.begin(), allScores.end(), [&](ScoreHolder& sh) {
+      // A plain loop: GCC's parallel mode would run std::for_each on
+      // several threads, which then draw from the random number generator
+      // concurrently and make the result differ between runs.
+      for (ScoreHolder& sh : allScores) {
         if (sh.isDecoy() &&
             PseudoRandom::lcg_uniform_rand() > decoyFractionTraining) {
           sh.label = LabelType::PSEUDO_TARGET;
         }
-      });
+      }
 
       // we do not necessarily need multiple folds with RESET because the pseudo
       // targets take care of the overfitting.

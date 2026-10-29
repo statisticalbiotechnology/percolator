@@ -143,6 +143,7 @@ LabelType DataSet::readPsm(const std::string& line, const unsigned int lineNr,
     }
   }
   if (!hasScannr) psm.scan = lineNr;
+  psm.setLineNr(lineNr);
   
   unsigned int numFeatures = static_cast<unsigned int>(FeatureNames::getNumFeatures());
   double* featureRow = featurePool.allocate();
