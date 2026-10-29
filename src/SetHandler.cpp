@@ -35,6 +35,7 @@ void SetHandler::releaseFeatures() {
 
 void SetHandler::reset() {
   subsets_.clear();
+  psmStore_.clear();
   featurePool_.destroyPool();
   DataSet::resetFeatureNames();
 }
@@ -260,14 +261,15 @@ void SetHandler::readPSMs(istream& dataStream, std::string& psmLine,
         PSMDescriptionPriority psmPriority;
         bool readProteins = false;
         psmPriority.label = DataSet::readPsm(psmLine, lineNr, optionalFields, 
-                                 readProteins, psmPriority.psm, featurePool_, decoyPrefix_);
+                                 readProteins, psmPriority.psm, featurePool_,
+                                 psmStore_, decoyPrefix_);
         psmPriority.priority = randIdx;
         subsetPSMs.push(psmPriority);
         if (subsetPSMs.size() > maxPSMs_) {
           PSMDescriptionPriority del = subsetPSMs.top();
           upperLimit = static_cast<unsigned int>(del.priority);
           featurePool_.deallocate(del.psm->features);
-          PSMDescription::deletePtr(del.psm);
+          psmStore_.release(del.psm);
           subsetPSMs.pop();
         }
       }
@@ -294,9 +296,11 @@ void SetHandler::readPSMs(istream& dataStream, std::string& psmLine,
         }
       }
       if (label == 1) {
-        targetSet->readPsm(psmLine, lineNr, optionalFields, featurePool_, decoyPrefix_);
+        targetSet->readPsm(psmLine, lineNr, optionalFields, featurePool_,
+                           psmStore_, decoyPrefix_);
       } else if (label == -1) {
-        decoySet->readPsm(psmLine, lineNr, optionalFields, featurePool_, decoyPrefix_);
+        decoySet->readPsm(psmLine, lineNr, optionalFields, featurePool_,
+                          psmStore_, decoyPrefix_);
       } else {
         std::cerr << "Warning: the PSM on line " << lineNr
             << " has a label not in {1,-1} and will be ignored." << std::endl;
@@ -319,15 +323,11 @@ void SetHandler::addQueueToSets(
     DataSet* targetSet, DataSet* decoySet) {
   while (!subsetPSMs.empty()) {
     PSMDescriptionPriority psmPriority = subsetPSMs.top();
+    // DataSet::readPsm only returns TARGET or DECOY
     if (psmPriority.label == LabelType::TARGET) {
       targetSet->registerPsm(psmPriority.psm);
-    } else if (psmPriority.label == LabelType::DECOY) {
-      decoySet->registerPsm(psmPriority.psm);
     } else {
-      std::cerr << "Warning: the PSM " << psmPriority.psm->getId()
-          << " has a label not in {1,-1} and will be ignored." << std::endl;
-      featurePool_.deallocate(psmPriority.psm->features);
-      PSMDescription::deletePtr(psmPriority.psm);
+      decoySet->registerPsm(psmPriority.psm);
     }
     subsetPSMs.pop();
   }
@@ -523,7 +523,8 @@ void SetHandler::readAndScorePSMs(istream& dataStream, std::string& psmLine,
     }
     psmLine = rtrim(psmLine);
     ScoreHolder sh;
-    sh.label = DataSet::readPsm(psmLine, lineNr, optionalFields, readProteins, sh.pPSM, featurePool_, decoyPrefix_);
+    sh.label = DataSet::readPsm(psmLine, lineNr, optionalFields, readProteins,
+                                sh.pPSM, featurePool_, psmStore_, decoyPrefix_);
     allScores.scoreAndAddPSM(sh, rawWeights, featurePool_);
     ++lineNr;
   } while (getline(dataStream, psmLine));

@@ -117,6 +117,7 @@ class SetHandler {
  protected:
   size_t maxPSMs_;
   size_t numPsmLines_ = 0;
+  PsmStore psmStore_;  // owns the PSMs of subsets_ and of -N pass 2
   std::vector<std::unique_ptr<DataSet> > subsets_;
   FeatureMemoryPool featurePool_;
   std::string decoyPrefix_; // Used to determine if a psm is a decoy

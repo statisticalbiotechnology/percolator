@@ -33,6 +33,7 @@
 #include "Scores.h"
 #include "Globals.h"
 #include "PSMDescription.h"
+#include "PsmStore.h"
 #include "FeatureNames.h"
 #include "FeatureMemoryPool.h"
 #include "ProteinProbEstimator.h"
@@ -72,17 +73,18 @@ class DataSet {
   
   void readPsm(const std::string& line, const unsigned int lineNr,
                const std::vector<OptionalField>& optionalFields, 
-               FeatureMemoryPool& featurePool, const std::string& decoyPrefix);
+               FeatureMemoryPool& featurePool, PsmStore& psmStore,
+               const std::string& decoyPrefix);
   static LabelType readPsm(const std::string& line, const unsigned int lineNr,
     const std::vector<OptionalField>& optionalFields, bool readProteins,
     PSMDescription*& myPsm, FeatureMemoryPool& featurePool,
-    const std::string& decoyPrefix);
+    PsmStore& psmStore, const std::string& decoyPrefix);
   
   void registerPsm(PSMDescription* myPsm);
   
  protected:   
   
-  std::vector<PSMDescription*> psms_;  // owned
+  std::vector<PSMDescription*> psms_;  // in input order, owned by a PsmStore
   LabelType label_ = LabelType::UNDEFINED;
   
   static FeatureNames featureNames_;

@@ -181,16 +181,17 @@ TEST_F(ScoresTest, CheckPopulating)
 {
     Scores scores(true);
     SetHandler setHandler(0);
+    PsmStore psmStore;
     DataSet *set1 = new DataSet();
     DataSet *set2 = new DataSet();
     set1->setLabel(LabelType::TARGET);
     set2->setLabel(LabelType::DECOY);
     for (int i = 0 ; i < 5 ; ++i) {
         PSMDescription *psm;
-        psm = new PSMDescription(psmNames[i]);
+        psm = psmStore.add(PSMDescription(psmNames[i]));
         psm->scan = 100 + i;
         set1->registerPsm(psm);
-        psm = new PSMDescription(psmNames[i]);
+        psm = psmStore.add(PSMDescription(psmNames[i]));
         psm->scan = 105 + i;
         set2->registerPsm(psm);
     }

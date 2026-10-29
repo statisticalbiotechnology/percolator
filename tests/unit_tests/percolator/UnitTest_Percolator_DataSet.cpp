@@ -27,6 +27,7 @@ class DataSetTest : public ::testing::Test {
     virtual void SetUp();
     virtual void TearDown();
     FeatureMemoryPool featurePool;
+    PsmStore psmStore;
     std::vector<OptionalField> optionalFields;
     PSMDescription *myPsm;
     std::string decoyPrefix;
@@ -42,7 +43,7 @@ void DataSetTest::SetUp()
 
 void DataSetTest::TearDown()
 {
-    delete myPsm;
+    psmStore.clear();
 }
 
 // A PSM line needs to at least contain an ID, a Peptide name, and a
@@ -50,7 +51,7 @@ void DataSetTest::TearDown()
 TEST_F(DataSetTest, ChecMinimalPsmParsing)
 {
     DataSet::readPsm("Id\t-1\tPEPTIDE\tProteinList",
-            1, optionalFields, true, myPsm, featurePool, decoyPrefix);
+            1, optionalFields, true, myPsm, featurePool, psmStore, decoyPrefix);
     ASSERT_TRUE(myPsm != NULL);
     ASSERT_EQ("Id", myPsm->getId());
     ASSERT_EQ("PEPTIDE", myPsm->getFullPeptide());
@@ -62,26 +63,26 @@ TEST_F(DataSetTest, ChecMinimalPsmParsing)
 TEST_F(DataSetTest, CheckInvalidPsmLines)
 {
     EXPECT_THROW(DataSet::readPsm("",
-            1, optionalFields, true, myPsm, featurePool, decoyPrefix), MyException);
+            1, optionalFields, true, myPsm, featurePool, psmStore, decoyPrefix), MyException);
     EXPECT_THROW(DataSet::readPsm("Id",
-            1, optionalFields, true, myPsm, featurePool, decoyPrefix), MyException);
+            1, optionalFields, true, myPsm, featurePool, psmStore, decoyPrefix), MyException);
     EXPECT_THROW(DataSet::readPsm("Id\t0",
-            1, optionalFields, true, myPsm, featurePool, decoyPrefix), MyException);
+            1, optionalFields, true, myPsm, featurePool, psmStore, decoyPrefix), MyException);
     EXPECT_THROW(DataSet::readPsm("Id\t0\tPEPTIDE",
-            1, optionalFields, true, myPsm, featurePool, decoyPrefix), MyException);
+            1, optionalFields, true, myPsm, featurePool, psmStore, decoyPrefix), MyException);
     EXPECT_THROW(DataSet::readPsm("Id\tPEPTIDE\tProteinList",
-            1, optionalFields, true, myPsm, featurePool, decoyPrefix), MyException);
+            1, optionalFields, true, myPsm, featurePool, psmStore, decoyPrefix), MyException);
 }
 
 TEST_F(DataSetTest, CheckPsmParsingWithFeatures)
 {
     optionalFields.push_back(CALCMASS);
     DataSet::readPsm("Id\t1\t1\tPEPTIDE\tProteinList",
-            1, optionalFields, true, myPsm, featurePool, decoyPrefix);
+            1, optionalFields, true, myPsm, featurePool, psmStore, decoyPrefix);
     DataSet::readPsm("Id\t1\t1\t2\t3\tPEPTIDE\tProteinList",
-            1, optionalFields, true, myPsm, featurePool, decoyPrefix);
+            1, optionalFields, true, myPsm, featurePool, psmStore, decoyPrefix);
     DataSet::readPsm("Id\t1\t0.0\t1.1\t2.2\t3.3\t4.4\t5.5\tPEPTIDE\tProteinList",
-            1, optionalFields, true, myPsm, featurePool, decoyPrefix);
+            1, optionalFields, true, myPsm, featurePool, psmStore, decoyPrefix);
 }
 
 // Verify that only integer values are accepted for the label.
@@ -89,16 +90,16 @@ TEST_F(DataSetTest, CheckFeatureParsing)
 {
     optionalFields.clear();
     DataSet::readPsm("Id\t1\tPEPTIDE\tProteinList",
-            1, optionalFields, true, myPsm, featurePool, decoyPrefix);
+            1, optionalFields, true, myPsm, featurePool, psmStore, decoyPrefix);
     DataSet::readPsm("Id\t-1\tPEPTIDE\tProteinList",
-            1, optionalFields, true, myPsm, featurePool, decoyPrefix);
+            1, optionalFields, true, myPsm, featurePool, psmStore, decoyPrefix);
     EXPECT_THROW(DataSet::readPsm("Id\t-1.3\tPEPTIDE\tProteinList",
-            1, optionalFields, true, myPsm, featurePool, decoyPrefix), MyException);
+            1, optionalFields, true, myPsm, featurePool, psmStore, decoyPrefix), MyException);
 
     DataSet::readPsm("Id\t100000000\tPEPTIDE\tProteinList",
-            1, optionalFields, true, myPsm, featurePool, decoyPrefix);
+            1, optionalFields, true, myPsm, featurePool, psmStore, decoyPrefix);
     EXPECT_THROW(DataSet::readPsm("Id\t100000000000000000000\tPEPTIDE\tProteinList",
-            1, optionalFields, true, myPsm, featurePool, decoyPrefix), MyException);
+            1, optionalFields, true, myPsm, featurePool, psmStore, decoyPrefix), MyException);
 }
 
 // Verify that features are successfully read.
@@ -109,18 +110,18 @@ TEST_F(DataSetTest, CheckOptionalFieldsParsing)
     optionalFields.push_back(CALCMASS);
     optionalFields.push_back(SCANNR);
     EXPECT_THROW(DataSet::readPsm("Id\t-1\tPEPTIDE\tProteinList",
-            1, optionalFields, true, myPsm, featurePool, decoyPrefix), MyException);
+            1, optionalFields, true, myPsm, featurePool, psmStore, decoyPrefix), MyException);
 
     DataSet::readPsm("Id\t-1\t2.5\t42\tPEPTIDE\tProteinList",
-            1, optionalFields, true, myPsm, featurePool, decoyPrefix);
+            1, optionalFields, true, myPsm, featurePool, psmStore, decoyPrefix);
     ASSERT_TRUE(myPsm != NULL);
     ASSERT_EQ(2.5, myPsm->calcMass);
     ASSERT_EQ(42, myPsm->scan);
 
     EXPECT_THROW(DataSet::readPsm("Id\t-1\t2:5\t42\tPEPTIDE\tProteinList",
-            1, optionalFields, true, myPsm, featurePool, decoyPrefix), MyException);
+            1, optionalFields, true, myPsm, featurePool, psmStore, decoyPrefix), MyException);
     EXPECT_THROW(DataSet::readPsm("Id\t-1\t2.5\t4I2\tPEPTIDE\tProteinList",
-            1, optionalFields, true, myPsm, featurePool, decoyPrefix), MyException);
+            1, optionalFields, true, myPsm, featurePool, psmStore, decoyPrefix), MyException);
 }
 
 // The feature pool can be destroyed and created again with another row

@@ -27,13 +27,6 @@ std::string PSMDescription::proteinNameSeparator_ = "\t";
 std::vector<string> PSMDescription::spectraFileNames_(0);
 size_t PSMDescription::lastSpectrumFileIndex_ = 0;
 
-void PSMDescription::deletePtr(PSMDescription* psm) {
-    if (psm != NULL) {
-        delete psm;
-        psm = NULL;
-    }
-}
-
 std::string PSMDescription::removePTMs(const string& peptide) {
     std::string peptideSequence = peptide;
     if (peptide.size() < 4) {

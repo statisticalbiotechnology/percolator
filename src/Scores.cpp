@@ -100,19 +100,13 @@ void Scores::scoreAndAddPSM(ScoreHolder& sh,
   featurePool.deallocate(sh.pPSM->features);
   sh.pPSM->features = NULL;
 
+  // DataSet::readPsm only returns TARGET or DECOY
   if (sh.isTarget()) {
     ++totalNumberOfTargets_;
-  } else if (sh.isDecoy()) {
+  } else {
     ++totalNumberOfDecoys_;
   }
-
-  if (!sh.isTarget() && !sh.isDecoy()) {
-    std::cerr << "Warning: the PSM " << sh.pPSM->getId()
-              << " has a label not in {1,-1} and will be ignored." << std::endl;
-    PSMDescription::deletePtr(sh.pPSM);
-  } else {
-    scores_.push_back(sh);
-  }
+  scores_.push_back(sh);
 }
 
 void Scores::print(LabelType label, std::ostream& os) {

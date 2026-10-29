@@ -107,12 +107,13 @@ TEST_F(CrossValidationTest, doStepTest)
     // but with the targets' values slightly less than the decoys'
     // values.
 
+    PsmStore psmStore;
     DataSet *targets = new DataSet();
     DataSet *decoys = new DataSet();
     targets->setLabel(LabelType::TARGET);
     decoys->setLabel(LabelType::DECOY);
     for (int i = 0 ; i < 2 * N ; ++i) {
-        PSMDescription *psm = new PSMDescription();
+        PSMDescription *psm = psmStore.add(PSMDescription());
         psm->features = new double[2];
         psm->features[0] = static_cast<double>(i) / N - 1E-6;
         psm->features[1] = static_cast<double>(i % 2);
@@ -120,7 +121,7 @@ TEST_F(CrossValidationTest, doStepTest)
         targets->registerPsm(psm);
     }
     for (int i = 0 ; i < N ; ++i) {
-        PSMDescription *psm = new PSMDescription();
+        PSMDescription *psm = psmStore.add(PSMDescription());
         psm->features = new double[2];
         psm->features[0] = static_cast<double>(i) / N;
         psm->features[1] = static_cast<double>(i % 2);

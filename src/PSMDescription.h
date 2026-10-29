@@ -18,6 +18,7 @@
 #define PSMDESCRIPTION_H_
 #include <cmath>
 #include <iostream>
+#include <limits>
 #include <map>
 #include <string>
 #include <string_view>
@@ -37,7 +38,6 @@ class PSMDescription {
     PSMDescription() = default;
     PSMDescription(const std::string& peptide) : peptide(peptide) {}
 
-    static void deletePtr(PSMDescription* psm);
 
     // TODO: move these static functions somewhere else
     static std::string removePTMs(const std::string& peptideSeq);
@@ -112,7 +112,7 @@ class PSMDescription {
 
     double* features = NULL;  // owned by a FeatureMemoryPool instance, no need to delete
     double expMass = 0.0, calcMass = 0.0;
-    double retentionTime_ = std::nan("");
+    double retentionTime_ = std::numeric_limits<double>::quiet_NaN();
     unsigned int scan = 0u;
     unsigned int specFileNr = 0u;
     std::vector<std::string> proteinIds;
