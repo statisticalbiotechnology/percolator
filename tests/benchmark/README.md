@@ -1,0 +1,18 @@
+# Benchmark helpers
+
+Scripts for timing Percolator on large inputs and for checking that a code
+change leaves the results unchanged. They need only the Python standard library.
+
+- `make_synthetic_pin.py` writes a deterministic synthetic pin file of any size,
+  for separate or concatenated target-decoy searches.
+- `compare_results.py` compares two result files, either byte for byte
+  (`--exact`) or within tolerances on accepted targets, q-values and PEPs.
+
+Per-stage wall clock and CPU times are printed to stderr with `-v 3`
+(lines starting with `Stage`).
+
+Example:
+
+    python3 make_synthetic_pin.py -n 1000000 --mode concatenated -o 1M.pin
+    percolator -S 1 -v 3 -m new_psms.txt 1M.pin
+    python3 compare_results.py --exact old_psms.txt new_psms.txt

@@ -747,6 +747,8 @@ void Caller::calculatePSMProb(Scores& allScores, bool isUniquePeptideRun) {
          << endl;
   }
 
+  StageTimer stageTimer(isUniquePeptideRun ? "peptide-level statistics"
+                                            : "PSM-level statistics");
   if (isUniquePeptideRun) {
     if (ProteinProbEstimator::getCalcProteinLevelProb()) {
       allScores.weedOutRedundant(protEstimator_->getPeptideSpecCounts(),
@@ -825,6 +827,7 @@ void Caller::writeResults(Scores& allScores,
  */
 void Caller::calculateProteinProbabilities(Scores& allScores) {
   Timer localTimer;
+  StageTimer stageTimer("protein inference");
 
   if (VERB > 0) {
     cerr << "\nCalculating protein level probabilities.\n";
@@ -901,7 +904,10 @@ bool Caller::loadAndNormalizeData(std::istream& dataStream,
     std::cerr << "Reading tab-delimited input from datafile " << inputFN_
                 << std::endl;
   }
-  success = setHandler.readTab(dataStream, pCheck_);
+  {
+    StageTimer stageTimer("read input");
+    success = setHandler.readTab(dataStream, pCheck_);
+  }
 
   // Reading input files (pin or temporary file)
   if (!success) {
@@ -920,7 +926,10 @@ bool Caller::loadAndNormalizeData(std::istream& dataStream,
               << FeatureNames::getNumFeatures() << endl;
   }
 
-  setHandler.normalizeFeatures(pNorm_);
+  {
+    StageTimer stageTimer("normalize features");
+    setHandler.normalizeFeatures(pNorm_);
+  }
 
   /*
   auto search-input detection cases:
@@ -984,7 +993,10 @@ bool Caller::loadAndNormalizeData(std::istream& dataStream,
   assert(!(useMixMax_ && targetDecoyCompetition_));
 
   allScores.setUsePi0(useMixMax_);
-  allScores.populateWithPSMs(setHandler);
+  {
+    StageTimer stageTimer("populate scores");
+    allScores.populateWithPSMs(setHandler);
+  }
 
   if (VERB > 0 && useMixMax_ &&
       abs(1.0 - allScores.getTargetDecoySizeRatio()) > 0.1) {
@@ -1021,9 +1033,12 @@ int Caller::run() {
 
   /* Validate tab file and get decoy prefix */
   TabFileValidator tabFileValidator;
-  if (!tabFileValidator.validateTabFiles(inputFNs_,
-                                         protEstimatorDecoyPrefix_)) {
-    return 0;
+  {
+    StageTimer stageTimer("validate input");
+    if (!tabFileValidator.validateTabFiles(inputFNs_,
+                                           protEstimatorDecoyPrefix_)) {
+      return 0;
+    }
   }
 
   if (inputFNs_.size() == 1) {
@@ -1120,10 +1135,16 @@ int Caller::run() {
   }
 
   // Do the SVM training
-  crossValidation.train(pNorm_);
+  {
+    StageTimer stageTimer("training");
+    crossValidation.train(pNorm_);
+  }
 
   // Calculate the final SVM scores and clean up structures
-  crossValidation.postIterationProcessing(allScores, pCheck_);
+  {
+    StageTimer stageTimer("post-iteration processing");
+    crossValidation.postIterationProcessing(allScores, pCheck_);
+  }
 
   if (weightOutputFN_.size() > 0) {
     ofstream weightStream(weightOutputFN_.c_str(), ios::out);
