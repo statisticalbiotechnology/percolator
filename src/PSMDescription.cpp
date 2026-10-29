@@ -55,8 +55,9 @@ std::string PSMDescription::removePTMs(const string& peptide) {
     return peptide.substr(0, 1) + std::string(".") + peptideSequence + std::string(".") + peptide.substr(peptide.size() - 1, 1);
 }
 
-void PSMDescription::printProteins(std::ostream& out) {
-    std::vector<std::string>::const_iterator it = proteinIds.begin();
+void PSMDescription::printProteins(std::ostream& out) const {
+    ProteinList proteinIds = proteins();
+    ProteinList::const_iterator it = proteinIds.begin();
     if (it != proteinIds.end()) {
         out << *it;
         for (++it; it != proteinIds.end(); ++it) {

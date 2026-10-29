@@ -18,6 +18,7 @@
 #define TABREADER_H_
 
 #include <string>
+#include <string_view>
 #include <charconv>
 #include <climits>
 #include <cstring>
@@ -92,12 +93,17 @@ class TabReader {
   }
   
   std::string readString() {
+    return std::string(readView());
+  }
+
+  // the next field, as a view into the line
+  std::string_view readView() {
     const char* pch = strchr(f_, '\t');
     if (pch == NULL) {
       err = 1;
-      return std::string(f_);
+      return std::string_view(f_);
     } else {
-      std::string s(f_, static_cast<std::basic_string<char>::size_type>(pch - f_));
+      std::string_view s(f_, static_cast<size_t>(pch - f_));
       advance(pch);
       return s;
     }

@@ -217,8 +217,9 @@ void ProteinProbEstimator::setTargetandDecoysNames(Scores& peptideScores) {
   std::vector<ScoreHolder>::iterator psm = peptideScores.begin();
   for (; psm!= peptideScores.end(); ++psm) {
     // for each protein
-    std::vector<std::string>::iterator protIt = psm->pPSM->proteinIds.begin();
-    for (; protIt != psm->pPSM->proteinIds.end(); protIt++) {
+    PSMDescription::ProteinList proteinIds = psm->pPSM->proteins();
+    PSMDescription::ProteinList::const_iterator protIt = proteinIds.begin();
+    for (; protIt != proteinIds.end(); ++protIt) {
       ProteinScoreHolder::Peptide peptide(psm->pPSM->getPeptideSequence(), 
           psm->isDecoy(), 0.0, psm->pep, psm->q, psm->score);
       if (proteinToIdxMap_.find(*protIt) == proteinToIdxMap_.end()) {
@@ -259,9 +260,10 @@ void ProteinProbEstimator::addSpectralCounts(Scores& peptideScores) {
   std::vector<ScoreHolder>::iterator psm = peptideScores.begin();
   for (; psm!= peptideScores.end(); ++psm) {
     // for each protein
-    std::vector<std::string>::const_iterator protIt = psm->pPSM->proteinIds.begin();
+    PSMDescription::ProteinList proteinIds = psm->pPSM->proteins();
+    PSMDescription::ProteinList::const_iterator protIt = proteinIds.begin();
     std::set<unsigned int> seenProteinIdxs;
-    for (; protIt != psm->pPSM->proteinIds.end(); protIt++) {
+    for (; protIt != proteinIds.end(); ++protIt) {
       if (proteinToIdxMap_.find(*protIt) != proteinToIdxMap_.end()) {
         unsigned int proteinIdx = static_cast<unsigned int>(proteinToIdxMap_[*protIt]);
         if (seenProteinIdxs.find(proteinIdx) == seenProteinIdxs.end()) {

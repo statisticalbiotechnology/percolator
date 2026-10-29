@@ -36,7 +36,33 @@
 class PSMDescription {
    public:
     PSMDescription() = default;
-    PSMDescription(const std::string& peptide) : peptide(peptide) {}
+    // the characters of peptide are not copied and must outlive the PSM
+    explicit PSMDescription(std::string_view peptide) : peptide(peptide) {}
+
+    // view of the protein names of a PSM, in input order
+    class ProteinList {
+     public:
+        class const_iterator {
+         public:
+            explicit const_iterator(const std::string* const* p) : p_(p) {}
+            const std::string& operator*() const { return **p_; }
+            const std::string* operator->() const { return *p_; }
+            const_iterator& operator++() { ++p_; return *this; }
+            bool operator==(const const_iterator& other) const { return p_ == other.p_; }
+            bool operator!=(const const_iterator& other) const { return p_ != other.p_; }
+         private:
+            const std::string* const* p_;
+        };
+        ProteinList(const std::string* const* first, size_t n) : first_(first), n_(n) {}
+        const_iterator begin() const { return const_iterator(first_); }
+        const_iterator end() const { return const_iterator(first_ + n_); }
+        size_t size() const { return n_; }
+        bool empty() const { return n_ == 0; }
+        const std::string& operator[](size_t i) const { return *first_[i]; }
+     private:
+        const std::string* const* first_;
+        size_t n_;
+    };
 
 
     // TODO: move these static functions somewhere else
@@ -51,17 +77,19 @@ class PSMDescription {
         return *one == *other;
     }
 
-    std::string getPeptideSequence() { return peptide.substr(2, peptide.size() - 4); }
+    std::string getPeptideSequence() const { return std::string(getPeptideSequenceView()); }
     // same as getPeptideSequence, without copying
     std::string_view getPeptideSequenceView() const {
-        return std::string_view(peptide).substr(2, peptide.size() - 4);
+        return peptide.substr(2, peptide.size() - 4);
     }
-    std::string& getFullPeptideSequence() { return peptide; }
-    std::string getFlankN() { return peptide.substr(0, 1); }
-    std::string getFlankC() { return peptide.substr(peptide.size() - 1, peptide.size()); }
+    std::string_view getFullPeptideSequence() const { return peptide; }
+    std::string getFlankN() const { return std::string(peptide.substr(0, 1)); }
+    std::string getFlankC() const {
+        return std::string(peptide.substr(peptide.size() - 1, peptide.size()));
+    }
 
     friend std::ostream& operator<<(std::ostream& out, PSMDescription& psm);
-    void printProteins(std::ostream& out);
+    void printProteins(std::ostream& out) const;
 
     bool operator<(const PSMDescription& other) const {
         return (peptide < other.peptide) ||
@@ -72,24 +100,33 @@ class PSMDescription {
         return (peptide == other.peptide);
     }
 
-    inline void setId(std::string id) { id_ = std::move(id); }
-    inline std::string& getId() { return id_; }
+    // the characters of id and pep_seq are not copied and must outlive the
+    // PSM, e.g. by being stored in a PsmStore
+    inline void setId(std::string_view id) { id_ = id; }
+    inline std::string_view getId() const { return id_; }
 
-    std::string& getFullPeptide() { return peptide; }
-    void setPeptide(std::string pep_seq) { peptide = std::move(pep_seq); }
+    std::string_view getFullPeptide() const { return peptide; }
+    void setPeptide(std::string_view pep_seq) { peptide = pep_seq; }
+
+    ProteinList proteins() const { return ProteinList(proteins_, numProteins_); }
+    // the list is not copied and must outlive the PSM
+    void setProteins(const std::string* const* list, size_t n) {
+        proteins_ = list;
+        numProteins_ = static_cast<unsigned int>(n);
+    }
     static inline void setProteinNameSeparator(const std::string sep) {
         proteinNameSeparator_ = sep;
     }
     static inline const std::string& getProteinNameSeparator() { return proteinNameSeparator_; }
 
-    void setSpectrumFileName(const std::string& fileName) {
+    void setSpectrumFileName(std::string_view fileName) {
         // consecutive PSMs usually come from the same file
         size_t& lastIndex = lastSpectrumFileIndex_;
         if (lastIndex >= spectraFileNames_.size() || spectraFileNames_[lastIndex] != fileName) {
             auto specFilePos = std::find(spectraFileNames_.begin(), spectraFileNames_.end(), fileName);
             lastIndex = specFilePos - spectraFileNames_.begin();
             if (specFilePos == spectraFileNames_.end()) {
-                spectraFileNames_.push_back(fileName);
+                spectraFileNames_.push_back(std::string(fileName));
             }
         }
         specFileNr = static_cast<unsigned int>(lastIndex);
@@ -115,11 +152,12 @@ class PSMDescription {
     double retentionTime_ = std::numeric_limits<double>::quiet_NaN();
     unsigned int scan = 0u;
     unsigned int specFileNr = 0u;
-    std::vector<std::string> proteinIds;
 
    protected:
-    std::string id_;
-    std::string peptide;
+    std::string_view id_;
+    std::string_view peptide;
+    const std::string* const* proteins_ = nullptr;
+    unsigned int numProteins_ = 0u;
     static std::string proteinNameSeparator_;
     static vector<std::string> spectraFileNames_;
     static size_t lastSpectrumFileIndex_;

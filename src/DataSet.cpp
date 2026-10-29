@@ -94,11 +94,11 @@ LabelType DataSet::readPsm(const std::string& line, const unsigned int lineNr,
     PSMDescription*& myPsm, FeatureMemoryPool& featurePool,
     PsmStore& psmStore, const std::string& decoyPrefix) {
   TabReader reader(line);
-  std::string tmp;
   
-  // parsed into a local object, which only goes into the store when complete
+  // Parsed into a local object, which only goes into the store when the
+  // line is complete. Until then its strings are views into line.
   PSMDescription psm;
-  psm.setId(reader.readString());
+  psm.setId(reader.readView());
   LabelType label = reader.readInt() == 1 ? LabelType::TARGET : LabelType::DECOY;
   
   bool hasScannr = false;
@@ -132,7 +132,7 @@ LabelType DataSet::readPsm(const std::string& line, const unsigned int lineNr,
           throw MyException(temp.str());
         break;
       } case FILENAME: {
-        psm.setSpectrumFileName(reader.readString());
+        psm.setSpectrumFileName(reader.readView());
         break;
       } default: {
         ostringstream temp;
@@ -170,8 +170,8 @@ LabelType DataSet::readPsm(const std::string& line, const unsigned int lineNr,
     throw MyException(temp.str());
   }
   
-  psm.setPeptide(reader.readString());
-  const std::string& peptide_seq = psm.getFullPeptide();
+  psm.setPeptide(reader.readView());
+  const std::string_view peptide_seq = psm.getFullPeptide();
   if (reader.error()) {
     ostringstream temp;
     temp << "ERROR: Reading tab file, error reading PSM " << psm.getId() 
@@ -193,18 +193,18 @@ LabelType DataSet::readPsm(const std::string& line, const unsigned int lineNr,
     }
   }
   
+  std::vector<std::string_view> proteins;
   if (readProteins) {
-    std::vector<std::string> proteins;
     if (PSMDescription::getProteinNameSeparator() == "\t") {
       while (!reader.error()) {
-        std::string tmp = reader.readString();
-        if (tmp.size() > 0) proteins.push_back(std::move(tmp));
+        std::string_view tmp = reader.readView();
+        if (tmp.size() > 0) proteins.push_back(tmp);
       }
     } else {
-      const std::string names = reader.readString();
+      const std::string_view names = reader.readView();
       const std::string& separator = PSMDescription::getProteinNameSeparator();
       size_t start = 0, pos = 0;
-      while ((pos = names.find(separator, start)) != std::string::npos) {
+      while ((pos = names.find(separator, start)) != std::string_view::npos) {
         if (pos > start) proteins.push_back(names.substr(start, pos - start));
         start = pos + separator.length();
       }
@@ -226,11 +226,10 @@ LabelType DataSet::readPsm(const std::string& line, const unsigned int lineNr,
         }
       }
     }
-    proteins.swap(psm.proteinIds); // shrink to fit
   }
 
   if (label == LabelType::DECOY && VERB > 1 && !decoyWarningTripped_) {
-    for (auto const& proteinId: psm.proteinIds) { 
+    for (auto const& proteinId: proteins) { 
       bool startsWithDecoyPrefix = (proteinId.rfind(decoyPrefix, 0) == 0);
       if (!startsWithDecoyPrefix && !decoyWarningTripped_) {
         std::cerr << "Warning: protein decoy prefix " << decoyPrefix 
@@ -240,6 +239,9 @@ LabelType DataSet::readPsm(const std::string& line, const unsigned int lineNr,
       }
     }
   }
+  psm.setId(psmStore.storeString(psm.getId()));
+  psm.setPeptide(psmStore.storeString(psm.getFullPeptide()));
+  psm.setProteins(psmStore.storeProteins(proteins), proteins.size());
   myPsm = psmStore.add(std::move(psm));
   return label;
 }

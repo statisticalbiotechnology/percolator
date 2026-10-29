@@ -55,8 +55,8 @@ TEST_F(DataSetTest, ChecMinimalPsmParsing)
     ASSERT_TRUE(myPsm != NULL);
     ASSERT_EQ("Id", myPsm->getId());
     ASSERT_EQ("PEPTIDE", myPsm->getFullPeptide());
-    ASSERT_EQ(1, myPsm->proteinIds.size());
-    ASSERT_EQ("ProteinList", myPsm->proteinIds[0]);
+    ASSERT_EQ(1, myPsm->proteins().size());
+    ASSERT_EQ("ProteinList", myPsm->proteins()[0]);
 }
 
 // Throw on lines with missing fields.
