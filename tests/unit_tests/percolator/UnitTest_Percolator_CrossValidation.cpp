@@ -130,8 +130,9 @@ TEST_F(CrossValidationTest, doStepTest)
     setHandler.push_back_dataset(std::unique_ptr<DataSet>(targets));
     setHandler.push_back_dataset(std::unique_ptr<DataSet>(decoys));
 
-    Normalizer *pNorm = NULL;
-    setHandler.normalizeFeatures(pNorm);
+    std::unique_ptr<Normalizer> norm = Normalizer::create(Normalizer::STDV);
+    setHandler.normalizeFeatures(*norm);
+    Normalizer* pNorm = norm.get();
 
     Scores scores(true);
     scores.populateWithPSMs(setHandler);
@@ -139,8 +140,8 @@ TEST_F(CrossValidationTest, doStepTest)
     // The pre-iteration setup should select the first feature to
     // be weighted.
 
-    SanityCheck *pCheck = new SanityCheck();
-    int numInit = crossValidation->preIterationSetup(scores, pCheck, pNorm);
+    SanityCheck check;
+    int numInit = crossValidation->preIterationSetup(scores, check, pNorm);
     std::vector< std::vector<double> > const& w = crossValidation->weights();
     for (int i = 0 ; i < 3 ; ++i) {
         EXPECT_EQ(1.0, w[i][0]);

@@ -82,7 +82,7 @@ CrossValidation::CrossValidation(bool quickValidation,
  * @return number of positives for initial setup
  */
 int CrossValidation::preIterationSetup(Scores& fullset,
-                                       SanityCheck* pCheck,
+                                       SanityCheck& check,
                                        const Normalizer* pNorm) {
   assert(nestedXvalBins_ >= 1u);
   // One input set per (nested) cross validation bin, to be reused multiple
@@ -102,7 +102,7 @@ int CrossValidation::preIterationSetup(Scores& fullset,
       numFolds_, vector<double>(FeatureNames::getNumFeatures() + 1));
   StageTimer stageTimer("initial direction");
   int numPositive =
-      pCheck->getInitDirection(testScores_, trainScores_, pNorm, weights_,
+      check.getInitDirection(testScores_, trainScores_, pNorm, weights_,
                                testFdr_, initialSelectionFdr_);
 
   initializeGridSearch(fullset.getTargetDecoySizeRatio());
@@ -514,7 +514,7 @@ int CrossValidation::mergeCpCnPairs(
 }
 
 void CrossValidation::postIterationProcessing(Scores& fullset,
-                                              SanityCheck* pCheck) {
+                                              SanityCheck& check) {
   if (decoyFractionTraining_ < 1.0) {
     // with RESET 1 decoy: decoysPerTarget = 1 and decoyFractionTraining = 0.5,
     // then factor = 1.5 and testNullTargetWinProb = 2/3 (and decoyFactor = 2)
@@ -545,7 +545,7 @@ void CrossValidation::postIterationProcessing(Scores& fullset,
     fullset.setNullTargetWinProb(testNullTargetWinProb);
   }
 
-  if (!pCheck->validateDirection(weights_)) {
+  if (!check.validateDirection(testScores_, trainScores_, weights_)) {
     for (std::size_t set = 0; set < numFolds_; ++set) {
       testScores_[set].calcScoresAndQvals(weights_[0], selectionFdr_);
     }

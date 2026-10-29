@@ -62,10 +62,11 @@ class Caller {
   int run();
 
  protected:
-  Normalizer* pNorm_;
-  SanityCheck* pCheck_;
-  ProteinProbEstimator* protEstimator_;
-  Enzyme* enzyme_;
+  std::unique_ptr<Normalizer> pNorm_;
+  int normalizerType_ = Normalizer::STDV;
+  SanityCheck check_;
+  std::unique_ptr<ProteinProbEstimator> protEstimator_;
+  std::unique_ptr<Enzyme> enzyme_;
   // holds the concatenation of multiple input files, removed at the end
   std::unique_ptr<TmpDir> tmpDir_;
 

@@ -58,12 +58,12 @@ class CrossValidation {
                   unsigned int numFolds);
 
   int preIterationSetup(Scores& fullset,
-                        SanityCheck* pCheck,
+                        SanityCheck& check,
                         const Normalizer* pNorm);
 
   void train(const Normalizer* pNorm);
 
-  void postIterationProcessing(Scores& fullset, SanityCheck* pCheck);
+  void postIterationProcessing(Scores& fullset, SanityCheck& check);
 
   void printAllWeights(ostream& weightStream, const Normalizer* pNorm);
 

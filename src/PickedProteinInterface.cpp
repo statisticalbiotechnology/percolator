@@ -46,7 +46,7 @@ bool PickedProteinInterface::initialize(Scores& peptideScores, const Enzyme* enz
   
   ENZYME_T cruxEnzyme;
   bool tryTrypsinP = false;
-  Enzyme* trypsinP = NULL;  
+  std::unique_ptr<Enzyme> trypsinP;
   switch (enzyme->getEnzymeType()) {
     case Enzyme::TRYPSIN:
       cruxEnzyme = TRYPSIN;
@@ -167,10 +167,6 @@ bool PickedProteinInterface::initialize(Scores& peptideScores, const Enzyme* enz
     if (total_non_enzymatic_flanks > peptideScores.size()) {
       std::cerr << "Warning: more than half of the cleavage sites are non enzymatic, "
                 << "please verify that the right protease was specified." << std::endl;
-    }
-    
-    if (trypsinP) {
-      delete trypsinP;
     }
   }
   

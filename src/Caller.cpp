@@ -39,11 +39,7 @@
 using namespace std;
 
 Caller::Caller()
-    : pNorm_(NULL),
-      pCheck_(NULL),
-      protEstimator_(NULL),
-      enzyme_(NULL),
-      tabInput_(true),
+    : tabInput_(true),
       readStdIn_(false),
       inputFN_(""),
       inputFNs_(),
@@ -81,24 +77,7 @@ Caller::Caller()
       useInterpolatingPep_(true),
       usePavaPep_(false) {}
 
-Caller::~Caller() {
-  if (pNorm_) {
-    delete pNorm_;
-  }
-  pNorm_ = NULL;
-  if (pCheck_) {
-    delete pCheck_;
-  }
-  pCheck_ = NULL;
-  if (protEstimator_) {
-    delete protEstimator_;
-  }
-  protEstimator_ = NULL;
-  if (enzyme_) {
-    delete enzyme_;
-  }
-  enzyme_ = NULL;
-}
+Caller::~Caller() {}
 
 string Caller::extendedGreeter() {
   ostringstream oss;
@@ -550,16 +529,16 @@ bool Caller::parseOptions(int argc, char** argv) {
     checkIsWritable(weightOutputFN_);
   }
   if (cmd.isOptionSet("init-weights")) {
-    SanityCheck::setInitWeightFN(cmd.options["init-weights"]);
+    check_.setInitWeightFN(cmd.options["init-weights"]);
   }
   if (cmd.isOptionSet("default-direction")) {
-    SanityCheck::setInitDefaultDirName(cmd.options["default-direction"]);
+    check_.setInitDefaultDirName(cmd.options["default-direction"]);
   }
   if (cmd.isOptionSet("unitnorm")) {
-    Normalizer::setType(Normalizer::UNI);
+    normalizerType_ = Normalizer::UNI;
   }
   if (cmd.isOptionSet("override")) {
-    SanityCheck::setOverrule(true);
+    check_.setOverrule(true);
   }
   if (cmd.isOptionSet("test-each-iteration")) {
     reportEachIteration_ = true;
@@ -640,7 +619,7 @@ bool Caller::parseOptions(int argc, char** argv) {
     selectedCpos_ = 0.5;
     selectedCneg_ = 0.5;
     skipNormalizeScores_ = true;
-    Normalizer::setType(Normalizer::NONORM);
+    normalizerType_ = Normalizer::NONORM;
     if (!cmd.isOptionSet("init-weights")) {
       std::cerr << "Error: the --static option requires the --init-weights "
                 << "option to be specified." << std::endl;
@@ -720,12 +699,12 @@ bool Caller::parseOptions(int argc, char** argv) {
       if (cmd.isOptionSet("protein-report-duplicates"))
         pickedProteinReportDuplicateProteins = true;
 
-      protEstimator_ = new PickedProteinInterface(
+      protEstimator_.reset(new PickedProteinInterface(
           fastaDatabase, pickedProteinPvalueCutoff,
           pickedProteinReportFragmentProteins,
           pickedProteinReportDuplicateProteins, protEstimatorTrivialGrouping,
           protEstimatorAbsenceRatio, protEstimatorOutputEmpirQVal,
-          protEstimatorDecoyPrefix_, protEstimatorPeptideQvalThreshold);
+          protEstimatorDecoyPrefix_, protEstimatorPeptideQvalThreshold));
     }
   }
 
@@ -841,7 +820,7 @@ void Caller::calculateProteinProbabilities(Scores& allScores) {
     cerr << protEstimator_->printCopyright();
   }
 
-  protEstimator_->initialize(allScores, enzyme_, protEstimatorDecoyPrefix_);
+  protEstimator_->initialize(allScores, enzyme_.get(), protEstimatorDecoyPrefix_);
 
   if (VERB > 1) {
     std::cerr << "Initialized protein inference engine." << std::endl;
@@ -913,7 +892,7 @@ bool Caller::loadAndNormalizeData(std::istream& dataStream,
   }
   {
     StageTimer stageTimer("read input");
-    success = setHandler.readTab(dataStream, pCheck_);
+    success = setHandler.readTab(dataStream, check_);
   }
 
   // Reading input files (pin or temporary file)
@@ -935,7 +914,8 @@ bool Caller::loadAndNormalizeData(std::istream& dataStream,
 
   {
     StageTimer stageTimer("normalize features");
-    setHandler.normalizeFeatures(pNorm_);
+    pNorm_ = Normalizer::create(normalizerType_);
+    setHandler.normalizeFeatures(*pNorm_);
   }
 
   /*
@@ -947,7 +927,7 @@ bool Caller::loadAndNormalizeData(std::istream& dataStream,
   -Y allowed) concatenated  separate         no       yes  NA -Y (force)
   */
   if (inputSearchType_ == "auto") {
-    if (pCheck_->concatenatedSearch()) {
+    if (check_.concatenatedSearch()) {
       if (useMixMax_) {
         if (VERB > 0) {
           std::cerr << "Warning: concatenated search input detected, "
@@ -983,13 +963,13 @@ bool Caller::loadAndNormalizeData(std::istream& dataStream,
         }
       }
     }
-  } else if (pCheck_->concatenatedSearch() && inputSearchType_ == "separate") {
+  } else if (check_.concatenatedSearch() && inputSearchType_ == "separate") {
     if (VERB > 0) {
       std::cerr << "Warning: concatenated search input detected, but "
                 << "overridden by -I flag specifying separate searches."
                 << std::endl;
     }
-  } else if (!pCheck_->concatenatedSearch() &&
+  } else if (!check_.concatenatedSearch() &&
              inputSearchType_ == "concatenated") {
     if (VERB > 0) {
       std::cerr << "Warning: separate searches input detected, but "
@@ -1083,12 +1063,12 @@ int Caller::run() {
     if (VERB > 1) {
       std::cerr << "Selecting best separating single variable." << std::endl;
     }
-    SanityCheck sc;
+    SanityCheck sc(check_);
     std::vector<std::vector<double>> ww(
         1, std::vector<double>(DataSet::getNumFeatures() + 1, 0.0));
     std::vector<Scores> tmpScoreVector;
     tmpScoreVector.push_back(std::move(allScores));
-    sc.getInitDirection(tmpScoreVector, tmpScoreVector, pNorm_, ww,
+    sc.getInitDirection(tmpScoreVector, tmpScoreVector, pNorm_.get(), ww,
                         selectionFdr_, initialSelectionFdr_);
     allScores = std::move(tmpScoreVector.at(0));
 
@@ -1133,7 +1113,7 @@ int Caller::run() {
         skipNormalizeScores_, decoyFractionTraining, numFolds);
 
     int firstNumberOfPositives =
-        crossValidation.preIterationSetup(allScores, pCheck_, pNorm_);
+        crossValidation.preIterationSetup(allScores, check_, pNorm_.get());
 
     if (VERB > 0) {
       cerr << "Found " << firstNumberOfPositives
@@ -1149,29 +1129,29 @@ int Caller::run() {
     timer.reset();
 
     if (tabOutputFN_.length() > 0) {
-      setHandler.writeTab(tabOutputFN_, pCheck_);
+      setHandler.writeTab(tabOutputFN_, check_);
     }
 
     // Do the SVM training
     {
       StageTimer stageTimer("training");
-      crossValidation.train(pNorm_);
+      crossValidation.train(pNorm_.get());
     }
 
     // Calculate the final SVM scores and clean up structures
     {
       StageTimer stageTimer("post-iteration processing");
-      crossValidation.postIterationProcessing(allScores, pCheck_);
+      crossValidation.postIterationProcessing(allScores, check_);
     }
 
     if (weightOutputFN_.size() > 0) {
       ofstream weightStream(weightOutputFN_.c_str(), ios::out);
-      crossValidation.printAllWeights(weightStream, pNorm_);
+      crossValidation.printAllWeights(weightStream, pNorm_.get());
       weightStream.close();
     }
 
     if (setHandler.getMaxPSMs() > 0u) {
-      crossValidation.getAvgWeights(rawWeights, pNorm_);
+      crossValidation.getAvgWeights(rawWeights, pNorm_.get());
     }
   }
   setHandler.releaseFeatures();
@@ -1186,7 +1166,7 @@ int Caller::run() {
     fileStream.clear();
     fileStream.seekg(0, ios::beg);
     success = setHandler.readAndScoreTab(fileStream, rawWeights, allScores,
-                                           pCheck_);
+                                         check_);
     // Reading input files (pin or temporary file)
     if (!success) {
       ostringstream temp;

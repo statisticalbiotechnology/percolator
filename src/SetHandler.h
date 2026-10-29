@@ -87,15 +87,15 @@ class SetHandler {
   
   // Reads in tab delimited stream and returns a SanityCheck object based on
   // the presence of default weights. Returns 0 on error, 1 on success.
-  int readTab(std::istream& dataStream, SanityCheck*& pCheck);
+  int readTab(std::istream& dataStream, SanityCheck& check);
   int readAndScoreTab(std::istream& dataStream, 
-    std::vector<double>& rawWeights, Scores& allScores, SanityCheck*& pCheck);
+    std::vector<double>& rawWeights, Scores& allScores, SanityCheck& check);
   void addQueueToSets(std::priority_queue<PSMDescriptionPriority>& subsetPSMs,
     DataSet* targetSet, DataSet* decoySet);
   
-  void writeTab(const std::string& dataFN, SanityCheck* pCheck);
+  void writeTab(const std::string& dataFN, const SanityCheck& check);
   void populateScoresWithPSMs(std::vector<ScoreHolder> &scores, LabelType label);
-  void normalizeFeatures(Normalizer*& pNorm);
+  void normalizeFeatures(Normalizer& norm);
   
   LabelType const getLabel(int setPos);
   inline int getSizeFromLabel(LabelType label) {

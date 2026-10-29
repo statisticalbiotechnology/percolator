@@ -60,12 +60,8 @@ class TrackedDataSet : public DataSet, DeletionTracker { };
 int SetHandlerTest::testInput(SetHandler *handler, char const *input)
 {
     std::istringstream str(input);
-    SanityCheck *pCheck = NULL;
-    int n = handler->readTab(str, pCheck);
-    if (n > 0)
-        EXPECT_TRUE(pCheck != NULL);
-    delete pCheck;
-    return n;
+    SanityCheck check;
+    return handler->readTab(str, check);
 }
 
 // Verify DataSets are stored correctly, and are deleted when
