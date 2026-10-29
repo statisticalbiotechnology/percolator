@@ -15,6 +15,10 @@
 
  *******************************************************************************/
 
+#ifdef _OPENMP
+#include <omp.h>
+#endif
+#include <algorithm>
 #include <cassert>
 #include <cmath>
 #include <fstream>
@@ -403,9 +407,10 @@ int Scores::calcScoresAndQvals(std::vector<double>& w,
  */
 int Scores::calcScores(std::vector<double>& w) {
   std::size_t ix;
-  std::vector<ScoreHolder>::iterator scoreIt = scores_.begin();
-  for (; scoreIt != scores_.end(); ++scoreIt) {
-    scoreIt->score = calcScore(scoreIt->pPSM->features, w);
+  const long numScores = static_cast<long>(scores_.size());
+#pragma omp parallel for schedule(static) if (numScores > 100000 && !omp_in_parallel())
+  for (long i = 0; i < numScores; ++i) {
+    scores_[i].score = calcScore(scores_[i].pPSM->features, w);
   }
   sort(scores_.begin(), scores_.end(), greater<ScoreHolder>());
   if (VERB > 3) {
@@ -455,6 +460,7 @@ int Scores::calcQvals(double fdr, bool skipDecoysPlusOne,
                                  nullTargetWinProb_);
 
   // set q-values and count number of positives
+  // (countTargetsBelowFdr below has to give the same count)
   std::vector<double>::const_iterator qIt = qvals.begin();
   std::vector<ScoreHolder>::iterator scoreIt = scores_.begin();
 
@@ -466,6 +472,52 @@ int Scores::calcQvals(double fdr, bool skipDecoysPlusOne,
   }
 
   return numPos;
+}
+
+/**
+ * Counts the targets with q-value below fdr, as calcQvals does, for scores
+ * listed in combined from best to worst. Within a group of tied scores all
+ * PSMs get the same q-value, so the count does not depend on the order of
+ * the PSMs within ties.
+ * PosteriorEstimator::setNegative(true) must have been called.
+ */
+int Scores::countTargetsBelowFdr(
+    const std::vector<pair<double, bool> >& combined,
+    double fdr,
+    bool skipDecoysPlusOne) const {
+  std::vector<double> qvals;
+  PosteriorEstimator::getQValues(pi0_, combined, qvals, skipDecoysPlusOne,
+                                 nullTargetWinProb_);
+  int numPos = 0;
+  for (std::size_t ix = 0; ix < qvals.size(); ++ix) {
+    if (qvals[ix] < fdr && combined[ix].second) {
+      ++numPos;
+    }
+  }
+  return numPos;
+}
+
+/**
+ * Returns the number of targets that calcScoresAndQvals(w, fdr,
+ * skipDecoysPlusOne) would report, without changing this object, so that it
+ * can be used concurrently. Only scores and labels are sorted, which is much
+ * cheaper than sorting the ScoreHolders.
+ * @param combined buffer for the (score, isTarget) pairs
+ */
+int Scores::countTargetsBelowFdr(const std::vector<double>& w,
+                                 double fdr,
+                                 bool skipDecoysPlusOne,
+                                 std::vector<pair<double, bool> >& combined) const {
+  combined.resize(scores_.size());
+  for (std::size_t ix = 0; ix < scores_.size(); ++ix) {
+    combined[ix] = pair<double, bool>(calcScore(scores_[ix].pPSM->features, w),
+                                      scores_[ix].isTarget());
+  }
+  std::sort(combined.begin(), combined.end(),
+            [](const pair<double, bool>& a, const pair<double, bool>& b) {
+              return a.first > b.first;
+            });
+  return countTargetsBelowFdr(combined, fdr, skipDecoysPlusOne);
 }
 
 void Scores::generateNegativeTrainingSet(AlgIn& data, const double cneg) {
@@ -594,27 +646,37 @@ int Scores::getInitDirection(const double initialSelectionFdr,
   // is too restrictive for small datasets
   bool skipDecoysPlusOne = true;
 
-  // pre-allocate once and reuse across all 2*numFeatures calcQvals calls
-  std::vector<pair<double, bool> > combined;
-  combined.reserve(scores_.size());
-
-  for (unsigned int featNo = 0; featNo < FeatureNames::getNumFeatures();
-       featNo++) {
-    for (std::vector<ScoreHolder>::iterator scoreIt = scores_.begin();
-         scoreIt != scores_.end(); ++scoreIt) {
-      scoreIt->score = scoreIt->pPSM->features[featNo];
+  // Number of positives when ordering by each feature, with low values
+  // first (i = 0) or high values first (i = 1). They only depend on the
+  // feature values and labels, so the features are evaluated in parallel
+  // on (value, isTarget) pairs.
+  const int numFeatures = static_cast<int>(FeatureNames::getNumFeatures());
+  std::vector<int> positivesPerDirection(2 * static_cast<size_t>(numFeatures));
+  PosteriorEstimator::setNegative(true);  // also get q-values for decoys
+#pragma omp parallel for schedule(dynamic, 1)
+  for (int featNo = 0; featNo < numFeatures; featNo++) {
+    std::vector<pair<double, bool> > combined(scores_.size());
+    for (std::size_t ix = 0; ix < scores_.size(); ++ix) {
+      combined[ix] = pair<double, bool>(scores_[ix].pPSM->features[featNo],
+                                        scores_[ix].isTarget());
     }
-    sort(scores_.begin(), scores_.end());
-    // check once in forward direction (i = 0, higher scores are better) and
-    // once in backward direction (i = 1, lower scores are better)
+    std::sort(combined.begin(), combined.end(),
+              [](const pair<double, bool>& a, const pair<double, bool>& b) {
+                return a.first < b.first;
+              });
+    positivesPerDirection[2 * featNo] = countTargetsBelowFdr(
+        combined, initialSelectionFdr, skipDecoysPlusOne);
+    std::reverse(combined.begin(), combined.end());
+    positivesPerDirection[2 * featNo + 1] = countTargetsBelowFdr(
+        combined, initialSelectionFdr, skipDecoysPlusOne);
+  }
+
+  for (int featNo = 0; featNo < numFeatures; featNo++) {
     for (int i = 0; i < 2; i++) {
-      if (i == 1) {
-        reverse(scores_.begin(), scores_.end());
-      }
-      int positives = calcQvals(initialSelectionFdr, skipDecoysPlusOne, combined);
+      int positives = positivesPerDirection[2 * featNo + i];
       if (positives > bestPositives) {
         bestPositives = positives;
-        bestFeature = static_cast<int>(featNo);
+        bestFeature = featNo;
         lowBest = (i == 0);
       }
     }

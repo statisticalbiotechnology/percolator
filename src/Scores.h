@@ -82,6 +82,9 @@ class Scores {
                          bool skipDecoysPlusOne = false);
   int calcScores(vector<double>& w);
   int calcQvals(double fdr, bool skipDecoysPlusOne = false);
+  int countTargetsBelowFdr(const std::vector<double>& w, double fdr,
+                           bool skipDecoysPlusOne,
+                           std::vector<std::pair<double, bool> >& combined) const;
   void calcPep(const bool spline = false, const bool interpol = true, const bool from_q = false);
  
   void populateWithPSMs(SetHandler& setHandler);
@@ -152,6 +155,10 @@ class Scores {
   void getScoreLabelPairs(std::vector<std::pair<double, bool> >& combined);
   int calcQvals(double fdr, bool skipDecoysPlusOne,
                 std::vector<std::pair<double, bool> >& combined);
+  int countTargetsBelowFdr(
+      const std::vector<std::pair<double, bool> >& combined,
+      double fdr,
+      bool skipDecoysPlusOne) const;
   void checkSeparationAndSetPi0();
   bool is_output_rt_ = false;
 };

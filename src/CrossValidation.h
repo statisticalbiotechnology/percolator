@@ -119,6 +119,8 @@ class CrossValidation {
 
   unsigned int numFolds_;  // number of folds for cross validation
   std::vector<Scores> trainScores_, testScores_;
+  // whether trainScores_ are scored and sorted with the current weights_
+  bool trainScoresCurrent_ = false;
   std::vector<double> candidatesCpos_, candidatesCfrac_;
 
   void initializeGridSearch(double targetDecoySizeRatio);

@@ -16,6 +16,7 @@
  *******************************************************************************/
 
 #include "CrossValidation.h"
+#include "PosteriorEstimator.h"
 #include "Timer.h"
 
 #ifdef _OPENMP
@@ -289,8 +290,13 @@ int CrossValidation::doStep(const Normalizer* pNorm, double selectionFdr) {
   {
     StageTimer stageTimer("rescore training sets");
     for (std::size_t set = 0; set < numFolds_; ++set) {
-      trainScores_[set].calcScoresAndQvals(weights_[set], selectionFdr,
-                                           skipDecoysPlusOne);
+      if (trainScoresCurrent_) {
+        // already scored and sorted with weights_ at the end of the last step
+        trainScores_[set].calcQvals(selectionFdr, skipDecoysPlusOne);
+      } else {
+        trainScores_[set].calcScoresAndQvals(weights_[set], selectionFdr,
+                                             skipDecoysPlusOne);
+      }
     }
   }
 
@@ -315,28 +321,31 @@ int CrossValidation::doStep(const Normalizer* pNorm, double selectionFdr) {
   {
     StageTimer stageTimer("build SVM input");
     for (std::size_t set = 0; set < numFolds_; ++set) {
-      std::vector<Scores> nestedTrainScores(nestedXvalBins_, usePi0_),
-          nestedTestScores(nestedXvalBins_, usePi0_);
+      // Without nested cross validation, the training set is also used for
+      // validation (sub-optimal cross validation). It is only copied if
+      // generatePositiveTrainingSet would reorder it.
+      std::vector<Scores> nestedTrainScores, nestedTestScores;
       if (nestedXvalBins_ > 1) {
         trainScores_[set].createXvalSetsBySpectrum(
             nestedTrainScores, nestedTestScores, nestedXvalBins_);
-      } else {
-        // sub-optimal cross validation
-        nestedTrainScores[0] = trainScores_[set];
-        nestedTestScores[0] = trainScores_[set];
+      } else if (trainBestPositive_) {
+        nestedTrainScores.push_back(trainScores_[set]);
       }
-      nestedTestScoresVec.push_back(nestedTestScores);
+      nestedTestScoresVec.push_back(std::move(nestedTestScores));
       // Set SVM input data for L2-SVM-MFN
       for (std::size_t nestedFold = 0; nestedFold < nestedXvalBins_;
            ++nestedFold) {
         AlgIn* svmInput = svmInputs_[set * nestedXvalBins_ + nestedFold];
+        Scores& nestedTrainSet = nestedTrainScores.empty()
+                                     ? trainScores_[set]
+                                     : nestedTrainScores[nestedFold];
         if ((VERB > 2) && (nestedFold == 0)) {
           cerr << "Split " << set + 1 << ": Training with " << svmInput->positives
                << " positives and " << svmInput->negatives << " negatives"
                << std::endl;
         }
-        nestedTrainScores[nestedFold].generateNegativeTrainingSet(*svmInput, 1.0);
-        nestedTrainScores[nestedFold].generatePositiveTrainingSet(
+        nestedTrainSet.generateNegativeTrainingSet(*svmInput, 1.0);
+        nestedTrainSet.generatePositiveTrainingSet(
             *svmInput, selectionFdr, 1.0, trainBestPositive_);
         if ((VERB > 2) && (nestedXvalBins_ > 1u)) {
           cerr << "Split " << set + 1 << " nested fold " << nestedFold
@@ -435,7 +444,27 @@ int CrossValidation::mergeCpCnPairs(
   //       scoring calculation in calcScores.
   unsigned int numCpCnPairsPerSet =
       static_cast<unsigned int>(classWeightsPerFold_.size() / numFolds_);
-#pragma omp parallel for schedule(dynamic, 1) ordered
+
+  // The validation counts of all pairs are independent, so they are computed
+  // in parallel. Without nested cross validation the training sets are the
+  // validation sets.
+  std::vector<int> truePositives(classWeightsPerFold_.size());
+  PosteriorEstimator::setNegative(true);  // also get q-values for decoys
+#pragma omp parallel for schedule(dynamic, 1)
+  for (int pairIdx = 0; pairIdx < static_cast<int>(classWeightsPerFold_.size());
+       ++pairIdx) {
+    const CandidateCposCfrac& cpCnPair = classWeightsPerFold_[pairIdx];
+    const std::vector<Scores>& nestedTestScores =
+        nestedTestScoresVec[cpCnPair.set];
+    const Scores& testSet =
+        nestedTestScores.empty()
+            ? trainScores_[cpCnPair.set]
+            : nestedTestScores[static_cast<std::size_t>(cpCnPair.nestedSet)];
+    std::vector<std::pair<double, bool> > combined;
+    truePositives[pairIdx] = testSet.countTargetsBelowFdr(
+        cpCnPair.ww, testFdr_, skipDecoysPlusOne, combined);
+  }
+
   for (int set = 0; set < static_cast<int>(numFolds_); ++set) {
     unsigned int a = set * numCpCnPairsPerSet;
     unsigned int b = (set + 1) * numCpCnPairsPerSet;
@@ -444,9 +473,7 @@ int CrossValidation::mergeCpCnPairs(
     std::map<std::pair<double, double>, int> intermediateResults;
     for (itCpCnPair = classWeightsPerFold_.begin() + a;
          itCpCnPair < classWeightsPerFold_.begin() + b; itCpCnPair++) {
-      tp = nestedTestScoresVec[set][static_cast<std::size_t>(
-                                        itCpCnPair->nestedSet)]
-               .calcScoresAndQvals(itCpCnPair->ww, testFdr_, skipDecoysPlusOne);
+      tp = truePositives[itCpCnPair - classWeightsPerFold_.begin()];
       intermediateResults[std::pair<double,double>{itCpCnPair->cpos,
                                                    itCpCnPair->cfrac}] += tp;
       itCpCnPair->tp = tp;
@@ -519,6 +546,7 @@ int CrossValidation::mergeCpCnPairs(
     bestTruePos +=
         trainScores_[set].calcScoresAndQvals(weights_[set], testFdr_);
   }
+  trainScoresCurrent_ = true;
   return static_cast<int>(bestTruePos / (numFolds_ - 1));
 }
 
