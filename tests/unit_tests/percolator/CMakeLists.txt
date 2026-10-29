@@ -31,20 +31,6 @@ enable_testing()
 include(GoogleTest)
 
 # =============================
-# Fetch or find Eigen3
-# =============================
-find_package(Eigen3 QUIET)
-if(NOT Eigen3_FOUND)
-    message(STATUS "Eigen3 not found, downloading it...")
-    FetchContent_Declare(
-      eigen
-      GIT_REPOSITORY https://gitlab.com/libeigen/eigen.git
-      GIT_TAG 3.4.0
-    )
-    FetchContent_MakeAvailable(eigen)
-endif()
-
-# =============================
 # Add test executable
 # =============================
 add_executable(gtest_unit
@@ -75,7 +61,6 @@ target_link_libraries(gtest_unit
   PRIVATE
     GTest::gtest
     GTest::gtest_main
-    Eigen3::Eigen
     perclibrary
     dblas
 )

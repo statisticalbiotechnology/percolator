@@ -10,8 +10,6 @@
 #include <chrono>
 using clock_type = std::chrono::high_resolution_clock;
 
-#include <Eigen/Dense>
-#include <Eigen/Sparse> 
 
 #include "MonotoneRegressor.h"
 #include "IsotonicPEP.h"

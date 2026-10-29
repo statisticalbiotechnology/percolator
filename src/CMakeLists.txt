@@ -70,52 +70,6 @@ list(APPEND COMMON_LIBRARIES Threads::Threads)
 add_subdirectory(dblas)
 set (DBLAS_LIBRARIES ${DBLAS_LIBRARIES} dblas)
 
-###############################################################################
-# PULL Eigen
-###############################################################################
-
-include(FetchContent)
-
-# Avoid Eigen's conflicting 'blas' target
-set(EIGEN_BUILD_BLAS OFF CACHE BOOL "" FORCE)
-set(EIGEN_BUILD_TESTING OFF CACHE BOOL "" FORCE)
-set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
-set(EIGEN_BUILD_DOC OFF CACHE BOOL "" FORCE)
-set(EIGEN_BUILD_PKGCONFIG OFF CACHE BOOL "" FORCE)
-
-if(NOT OpenMP_CXX_FOUND)
-  message(STATUS "OpenMP not found; building Eigen without it")
-endif()
-
-# Avoid adding Eigen's blas directory (explicitly ignore it)
-set(EIGEN_DISABLE_BLAS ON CACHE BOOL "Disable Eigen's BLAS build" FORCE)
-
-FetchContent_Declare(
-  eigen
-  GIT_REPOSITORY https://gitlab.com/libeigen/eigen.git
-  GIT_TAG 3.4.0
-)
-
-FetchContent_MakeAvailable(eigen)
-include_directories(${eigen_SOURCE_DIR})
-
-### Patch for avoiding _finite
-
-set(EIGEN_MATHFUNCTIONS_FILE "${eigen_SOURCE_DIR}/Eigen/src/Core/MathFunctions.h")
-
-# Do the patch if not already patched
-file(READ "${EIGEN_MATHFUNCTIONS_FILE}" MATHFUNCS_CONTENT)
-
-string(REGEX REPLACE
-  "#elif EIGEN_USE_STD_FPCLASSIFY[ \r\n]+[^\r\n]*using std::isfinite;[ \r\n]+[^\r\n]*return isfinite[^\r\n]*;"
-  "#elif EIGEN_USE_STD_FPCLASSIFY\n    return !std::isnan(x) && !std::isinf(x); // PATCHED to avoid std::isfinite on MSVC"
-  MATHFUNCS_CONTENT_PATCHED
-  "${MATHFUNCS_CONTENT}"
-)
-
-file(WRITE "${EIGEN_MATHFUNCTIONS_FILE}" "${MATHFUNCS_CONTENT_PATCHED}")
-### End patch
-
 if (MSVC)
   add_compile_definitions(
     _HAS_STD_BYTE=0     # disables std::byte so 'byte' in Windows headers is unambiguous
@@ -138,7 +92,6 @@ if(OpenMP_CXX_FOUND)
   target_link_libraries(perclibrary PUBLIC ${COMMON_LIBRARIES} OpenMP::OpenMP_CXX)
 else()
   target_link_libraries(perclibrary PUBLIC ${COMMON_LIBRARIES})
-  target_compile_definitions(perclibrary PUBLIC EIGEN_DONT_PARALLELIZE)
 endif()
 
 ###############################################################################
