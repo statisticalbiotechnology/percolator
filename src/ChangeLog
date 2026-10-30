@@ -1,10 +1,12 @@
 Unreleased
-Changes of results (--classic-training restores the previous training):
+Changes of results:
 * Each Cpos/Cneg solve starts from its weights of the previous iteration, and the least squares steps of L2_SVM_MFN are solved exactly (Cholesky on the normal equations) instead of by CGLS.
 * The Cpos/Cneg pair of each fold is fixed after three iterations, and training stops when the estimated positives grow by less than 0.1% over two iterations. --maxiter remains the upper limit.
 * The I-spline PEP fit is solved exactly by an active-set method. The trust-region solver stopped at its iteration limit. PEPs change by up to about 0.06; calibration on synthetic data is unchanged.
 * Results no longer depend on the number of threads: all sort comparators are total orders, with the input line as the last tie-break. Only ties are affected.
-* New option --classic-training: fixed number of iterations, full grid in every iteration, CGLS solves from zero weights.
+* New option --classic-training restores the previous training: fixed number of iterations, full grid in every iteration, CGLS solves from zero weights.
+* qvality estimates PEPs by I-spline regression of the target q values, as Percolator does; --pava-pep, --tdc-pep and --rank-pep select the other monotone regressions, and --irls-pep the previous P-IRLS method.
+* New option --tdc-pep (Percolator and qvality): PEPs from a monotone fit of the decoy rate p on the score, PEP = p/(1-p), scaled by pi0 and the target/decoy ratio for separate searches. The default remains the regression of the target q values.
 Fixes:
 * --train-best-positive corrupted the training folds with nested cross-validation, which RESET also uses.
 * RESET: the pseudo-target labels differed between runs, and a single fold led to a division by zero in the stopping rule.
@@ -30,6 +32,7 @@ Interface changes (Crux and other library users):
 * SanityCheck's static setters are member functions; SqtSanityCheck removed.
 * Normalizer::getNormalizer, resetNormalizer and setType replaced by Normalizer::create; Enzyme::createEnzyme returns std::unique_ptr.
 * CGLS and L2_SVM_MFN take std::vector arguments; vector_double and vector_int removed; AlgIn is a value type.
+* Scores::calcPep takes a fourth argument (tdc); InferPEP::tdc_to_pep takes an optional odds factor; PosteriorEstimator has an estimateMonotonePEP member.
 * Globals: logger and stream redirection functions removed. Timer::getStartTimeStr returns std::string. ScoreHolder has no virtual destructor and no p field.
 
 v3.09
