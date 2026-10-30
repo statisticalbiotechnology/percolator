@@ -73,7 +73,8 @@ Caller::Caller()
       numThreads_(3u), 
       useIrlsPep_(false),
       useInterpolatingPep_(true),
-      usePavaPep_(false) {}
+      usePavaPep_(false),
+      useTdcPep_(false) {}
 
 Caller::~Caller() {}
 
@@ -385,6 +386,14 @@ bool Caller::parseOptions(int argc, char** argv) {
         "pava-pep",
         "Calculate PEPs using PAVA isotonic regression.",
         "", TRUE_IF_SET);
+  cmd.defineOption("",
+      "tdc-pep",
+      "Calculate PEPs from target and decoy labels: fit the decoy rate p as "
+      "a monotone function of the score and report p/(1-p). Applies to the "
+      "I-spline and --pava-pep regressions. With separate target and decoy "
+      "searches the odds are multiplied by pi0 and the ratio of targets to "
+      "decoys. By default PEPs are derived from the q values of the targets.",
+      "", TRUE_IF_SET);
 
   // finally parse and handle return codes (display help etc...)
   cmd.parseArgs(argc, argv);
@@ -498,6 +507,13 @@ bool Caller::parseOptions(int argc, char** argv) {
   }
   if (cmd.isOptionSet("pava-pep")) {
     usePavaPep_ = true;
+  }
+  if (cmd.isOptionSet("tdc-pep")) {
+    useTdcPep_ = true;
+    if (useIrlsPep_) {
+      std::cerr << "Warning: --tdc-pep has no effect with --irls-pep."
+                << std::endl;
+    }
   }
 
   if (cmd.isOptionSet("tab-in")) {
@@ -779,7 +795,8 @@ void Caller::calculatePSMProb(Scores& allScores, bool isUniquePeptideRun) {
   bool pepNeeded = isUniquePeptideRun || writeOutput || !psmResultFN_.empty() ||
                    !decoyPsmResultFN_.empty();
   if (pepNeeded) {
-    allScores.calcPep(useIrlsPep_, useInterpolatingPep_, usePavaPep_);
+    allScores.calcPep(useIrlsPep_, useInterpolatingPep_, usePavaPep_,
+                      useTdcPep_);
   }
   writeResults(allScores, isUniquePeptideRun, writeOutput);
 }

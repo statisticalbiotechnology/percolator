@@ -91,7 +91,11 @@ class Scores {
       double fdr,
       bool skipDecoysPlusOne,
       std::vector<std::pair<double, bool> >& combined) const;
-  void calcPep(const bool spline = false, const bool interpol = true, const bool from_q = false);
+  // PEPs by P-IRLS (spline), or by I-spline/PAVA (pava) regression of either
+  // target q values (default) or target-decoy labels (tdc) on the score
+  // (interpol) or the rank
+  void calcPep(const bool spline = false, const bool interpol = true,
+               const bool pava = false, const bool tdc = false);
  
   void populateWithPSMs(SetHandler& setHandler);
 

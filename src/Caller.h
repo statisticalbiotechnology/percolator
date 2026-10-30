@@ -97,7 +97,8 @@ class Caller {
   bool classicTraining_ = false;
   bool reportEachIteration_, quickValidation_, trainBestPositive_,
       skipNormalizeScores_, analytics_, useResetAlgorithm_,
-      useCompositionMatch_, useIrlsPep_, useInterpolatingPep_, usePavaPep_;
+      useCompositionMatch_, useIrlsPep_, useInterpolatingPep_, usePavaPep_,
+      useTdcPep_;
 
   // reporting parameters
   std::string call_;

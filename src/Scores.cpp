@@ -796,8 +796,34 @@ void Scores::checkSeparationAndSetPi0() {
   }
 }
 
-void Scores::calcPep(const bool spline, const bool interp, const bool pava) {
-    if (!spline) {
+void Scores::calcPep(const bool spline, const bool interp, const bool pava,
+                     const bool tdc) {
+    if (!spline && tdc) {
+        // Fit the decoy rate p as a monotone function of the score and
+        // report the odds p / (1 - p) as PEP, for targets and decoys alike.
+        std::vector<double> is_decoy, sc;
+        is_decoy.reserve(scores_.size());
+        sc.reserve(scores_.size());
+        for (const auto& sh : scores_) {
+            is_decoy.push_back(sh.isTarget() ? 0.0 : 1.0);
+            sc.push_back(sh.score);
+        }
+        // With separate target and decoy searches (mix-max) the decoys
+        // sample the null of all targets, so the odds are scaled by pi0 and
+        // by the ratio of targets to decoys.
+        double oddsFactor = 1.0;
+        if (usePi0_) {
+            double numTargets = 0.0, numDecoys = 0.0;
+            for (double d : is_decoy) (d > 0.5 ? numDecoys : numTargets) += 1.0;
+            oddsFactor = pi0_ * numTargets / std::max(1.0, numDecoys);
+        }
+        InferPEP reg(!pava);
+        auto peps = interp ? reg.tdc_to_pep(is_decoy, sc, oddsFactor)
+                           : reg.tdc_to_pep(is_decoy, {}, oddsFactor);
+        for (size_t ix = 0; ix < scores_.size(); ++ix) {
+            scores_[ix].pep = peps[ix];
+        }
+    } else if (!spline) {
         // Derive PEPs from q-values so that average PEP ≈ q at every
         // threshold.  Use PAVA when --pava-pep is set, otherwise I-spline
         // for smooth output.
