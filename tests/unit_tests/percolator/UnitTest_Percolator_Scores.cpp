@@ -20,6 +20,7 @@
  */
 
 #include <gtest/gtest.h>
+#include <cmath>
 #include <cstdarg>
 #include "SetHandler.h"
 #include "DataSet.h"
@@ -278,4 +279,57 @@ TEST(ScoresCountTest, CountTargetsBelowFdrMatchesCalcScoresAndQvals)
         delete psm;
     }
     FeatureNames::resetNumFeatures();
+}
+
+// Both PEP pathways of calcPep, from target q values (default) and from the
+// target-decoy labels (tdc), with I-spline and PAVA regression, give PEPs in
+// [0, 1] that do not decrease down the list, and whose mean over the targets
+// above a q value threshold is close to that threshold.
+TEST(ScoresPepTest, BothPathwaysGiveMonotoneCalibratedPeps)
+{
+    const int numPsms = 6000;
+    std::vector<PSMDescription> psms(numPsms);
+    unsigned int seed = 777u;
+    auto uniform = [&seed]() {
+        seed = seed * 1103515245u + 12345u;
+        return ((seed >> 8) + 0.5) / 16777216.0;
+    };
+    auto normal = [&uniform]() {
+        return std::sqrt(-2.0 * std::log(uniform())) *
+               std::cos(6.283185307179586 * uniform());
+    };
+    for (bool tdc : {false, true}) {
+        for (bool pava : {false, true}) {
+            Scores scores(false);
+            seed = 777u;
+            for (int i = 0; i < numPsms; ++i) {
+                psms[i].scan = static_cast<unsigned int>(i);
+                const bool isTarget = uniform() < 0.5;
+                const bool correct = isTarget && uniform() < 0.4;
+                scores.addScoreHolder(ScoreHolder(normal() + (correct ? 3.0 : 0.0),
+                    isTarget ? LabelType::TARGET : LabelType::DECOY, &psms[i]));
+            }
+            scores.recalculateSizes();
+            // calcQvals and calcPep expect the PSMs sorted by score
+            std::sort(scores.begin(), scores.end(), std::greater<ScoreHolder>());
+            scores.calcQvals(0.01);
+            scores.calcPep(false, true, pava, tdc);
+            double lastTargetPep = 0.0, sum = 0.0;
+            int n = 0;
+            for (const ScoreHolder& sh : scores) {
+                ASSERT_GE(sh.pep, 0.0);
+                ASSERT_LE(sh.pep, 1.0);
+                if (!sh.isTarget()) continue;
+                EXPECT_GE(sh.pep, lastTargetPep - 1e-12);
+                lastTargetPep = sh.pep;
+                if (sh.q <= 0.05) {
+                    sum += sh.pep;
+                    ++n;
+                }
+            }
+            ASSERT_GT(n, 100);
+            EXPECT_GT(sum / n, 0.05 / 2.0) << "tdc=" << tdc << " pava=" << pava;
+            EXPECT_LT(sum / n, 0.05 * 2.0) << "tdc=" << tdc << " pava=" << pava;
+        }
+    }
 }
