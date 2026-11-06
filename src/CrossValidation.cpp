@@ -615,8 +615,13 @@ void CrossValidation::postIterationProcessing(Scores& fullset,
   }
 
   if (!check.validateDirection(testScores_, trainScores_, weights_)) {
+    // With --override the folds keep their trained vectors, and each test
+    // bin is scored with its own fold's vector: the other folds' vectors
+    // were trained on it.
+    const bool reset = !check.getOverrule();
     for (std::size_t set = 0; set < numFolds_; ++set) {
-      testScores_[set].calcScoresAndQvals(weights_[0], selectionFdr_);
+      testScores_[set].calcScoresAndQvals(reset ? weights_[0] : weights_[set],
+                                          selectionFdr_);
     }
   }
   fullset.merge(testScores_, selectionFdr_, skipNormalizeScores_, weights_);
