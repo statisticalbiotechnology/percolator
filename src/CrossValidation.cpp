@@ -614,7 +614,9 @@ void CrossValidation::postIterationProcessing(Scores& fullset,
     fullset.setNullTargetWinProb(testNullTargetWinProb);
   }
 
-  if (!check.validateDirection(testScores_, trainScores_, weights_)) {
+  const bool validDirection =
+      check.validateDirection(testScores_, trainScores_, weights_);
+  if (!validDirection) {
     // Each test bin is scored with its own fold's vector: after a reset the
     // default vector chosen on that fold's training set, with --override
     // the trained vector, since the other folds' vectors were trained on
@@ -623,7 +625,29 @@ void CrossValidation::postIterationProcessing(Scores& fullset,
       testScores_[set].calcScoresAndQvals(weights_[set], selectionFdr_);
     }
   }
-  fullset.merge(testScores_, selectionFdr_, skipNormalizeScores_, weights_);
+
+  // With the TRAIN and TRAIN_DECOYS schemes, each test bin is rescaled by
+  // anchors taken from its fold's training set, scored with the same final
+  // weights as the test bin. The training set holds (numFolds_ - 1) times
+  // as many PSMs as the test bin, or the same PSMs with one fold, so the
+  // anchors exist and are less noisy for small test bins.
+  std::vector<ScoreScale> binScales;
+  if (!skipNormalizeScores_ &&
+      (mergeNormalization_ == MergeNormalization::TRAIN ||
+       mergeNormalization_ == MergeNormalization::TRAIN_DECOYS)) {
+    binScales.resize(numFolds_);
+    for (std::size_t set = 0; set < numFolds_; ++set) {
+      binScales[set] = trainScores_[set].calcScoreScale(
+          weights_[set], mergeNormalization_, selectionFdr_);
+      if (VERB > 2) {
+        std::cerr << "Split " << set + 1 << ": rescaling the test scores by "
+                  << "the training set, offset " << binScales[set].offset
+                  << " and scale " << binScales[set].scale << std::endl;
+      }
+    }
+  }
+  fullset.merge(testScores_, selectionFdr_, skipNormalizeScores_, weights_,
+                mergeNormalization_, binScales);
 }
 
 /**

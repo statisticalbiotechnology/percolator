@@ -86,6 +86,11 @@ class CrossValidation {
   }
   // train as Percolator 3.09 did, see Caller's --classic-training
   void inline setClassicTraining(bool on) { classicTraining_ = on; }
+  // how the scores of the test bins are put on a common scale before they
+  // are merged, see Caller's --merge-normalization
+  void inline setMergeNormalization(MergeNormalization scheme) {
+    mergeNormalization_ = scheme;
+  }
 
  protected:
   std::vector<AlgIn> svmInputs_;
@@ -113,6 +118,7 @@ class CrossValidation {
 
   bool trainBestPositive_;
   bool skipNormalizeScores_;
+  MergeNormalization mergeNormalization_ = MergeNormalization::TEST;
 
   double decoyFractionTraining_;
 
