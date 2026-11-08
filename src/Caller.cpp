@@ -175,7 +175,11 @@ bool Caller::parseOptions(int argc, char** argv) {
       "features, 4-19% per input for 1,000-5,000 PSMs or weakly separating "
       "inputs, and all of them for inputs without signal. N = 1 is meant for "
       "inputs too small to "
-      "split and is never switched on automatically. Default = 3.",
+      "split and is never switched on automatically. With N > 3 the test "
+      "bins are smaller than with the default, too small for anchors taken "
+      "from each bin, so they are put on a common scale by the decoys of "
+      "each fold's training set (--merge-normalization train-decoys) unless "
+      "a scheme is given. Default = 3.",
       "number");
   cmd.defineOption("", "classic-training",
                    "Train the SVMs as Percolator 3.09 did: every SVM is "
@@ -393,9 +397,10 @@ bool Caller::parseOptions(int argc, char** argv) {
       "rescaled in this way before they are averaged, and only 'test' "
       "rescales the scores of all PSMs once more. With one fold, as with "
       "--reset-algorithm, only the scale of the reported scores changes. No "
-      "effect with --static. Default = test; train-decoys with "
-      "--direction-check pooled, and in a run whose trained SVMs the "
-      "second chance of --direction-check keeps.",
+      "effect with --static. Default = test with up to 3 folds; "
+      "train-decoys with more folds (--num-folds), with --direction-check "
+      "pooled, and in a run whose trained SVMs the second chance of "
+      "--direction-check keeps.",
       "scheme");
   cmd.defineOption(
       Option::EXPERIMENTAL_FEATURE, "direction-check",
@@ -708,6 +713,7 @@ bool Caller::parseOptions(int argc, char** argv) {
   }
 
   if (cmd.isOptionSet("merge-normalization")) {
+    mergeNormalizationSet_ = true;
     const std::string scheme = cmd.options["merge-normalization"];
     if (scheme == "test") {
       mergeNormalization_ = MergeNormalization::TEST;
@@ -755,6 +761,7 @@ bool Caller::parseOptions(int argc, char** argv) {
   if (check_.directionCheck() == SanityCheck::DirectionCheck::POOLED) {
     if (!cmd.isOptionSet("merge-normalization")) {
       mergeNormalization_ = MergeNormalization::TRAIN_DECOYS;
+      mergeNormalizationSet_ = true;
     } else if (mergeNormalization_ == MergeNormalization::TEST) {
       std::cerr << "Error: --direction-check pooled cannot be combined with "
                 << "--merge-normalization test, whose anchors are taken from "
@@ -1285,12 +1292,29 @@ int Caller::run() {
     }
   }
 
+  // The test scheme anchors each test bin at its own score at q = --trainFDR.
+  // With more folds than the default the bins are smaller and that anchor
+  // noisy, so without a given scheme they are merged by their training-set
+  // decoys. --static never rescales and keeps test, which decides how -N
+  // scores all PSMs.
+  MergeNormalization mergeNormalization = mergeNormalization_;
+  if (!mergeNormalizationSet_ && !skipNormalizeScores_) {
+    mergeNormalization = CrossValidation::defaultMergeNormalization(numFolds);
+    if (mergeNormalization != mergeNormalization_ && VERB > 1) {
+      std::cerr << "Merging the " << numFolds << " cross-validation bins "
+                << "with --merge-normalization "
+                << mergeNormalizationName(mergeNormalization)
+                << ", the default with more than " << kDefaultNumFolds
+                << " folds." << std::endl;
+    }
+  }
+
   // The cross-validation sets and SVM inputs are only needed for training,
   // the scope releases them before the post-processing steps.
   std::vector<double> rawWeights;
   // the scheme of the merge, which the second chance of the direction check
   // can change
-  MergeNormalization usedMergeNormalization = mergeNormalization_;
+  MergeNormalization usedMergeNormalization = mergeNormalization;
   {
     CrossValidation crossValidation(
         quickValidation_, reportEachIteration_, testFdr_, selectionFdr_,
@@ -1298,7 +1322,7 @@ int Caller::run() {
         useMixMax_, nestedXvalBins_, trainBestPositive_, numThreads_,
         skipNormalizeScores_, decoyFractionTraining, numFolds);
     crossValidation.setClassicTraining(classicTraining_);
-    crossValidation.setMergeNormalization(mergeNormalization_);
+    crossValidation.setMergeNormalization(mergeNormalization);
 
     int firstNumberOfPositives =
         crossValidation.preIterationSetup(allScores, check_, pNorm_.get());

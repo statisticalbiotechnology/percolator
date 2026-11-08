@@ -100,6 +100,9 @@ class Caller {
   bool classicTraining_ = false;
   // --merge-normalization
   MergeNormalization mergeNormalization_ = MergeNormalization::TEST;
+  // a scheme was given, or set by --direction-check pooled; otherwise run()
+  // takes CrossValidation::defaultMergeNormalization of the folds
+  bool mergeNormalizationSet_ = false;
   bool reportEachIteration_, quickValidation_, trainBestPositive_,
       skipNormalizeScores_, analytics_, useResetAlgorithm_,
       useCompositionMatch_, useIrlsPep_, useInterpolatingPep_, usePavaPep_,
