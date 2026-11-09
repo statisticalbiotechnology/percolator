@@ -53,10 +53,7 @@ Compared with the recipe for 3.9:
 ### Later releases
 
 From the release after 3.09.1, Percolator uses `std::filesystem` instead of
-Boost. The Boost requirement then goes, and osx-64 needs macOS 10.15 or later,
-set in the recipe's `conda_build_config.yaml`:
-
-```yaml
-c_stdlib_version:  # [osx and x86_64]
-  - "10.15"        # [osx and x86_64]
-```
+Boost, and it no longer downloads Eigen. `libboost-devel` and `git` then go
+from the requirements. `std::filesystem` needs macOS 10.15 or later; the
+conda-forge pinnings set 11.0 for both macOS platforms (November 2026), so
+the recipe needs no setting of its own.
