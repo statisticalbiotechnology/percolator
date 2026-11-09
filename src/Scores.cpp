@@ -942,7 +942,7 @@ void Scores::weedOutRedundantTDC() {
 }
 
 int Scores::getInitDirection(const double initialSelectionFdr,
-                             std::vector<double>& direction) {
+                             std::vector<double>& direction) const {
   int bestPositives = -1;
   int bestFeature = -1;
   bool lowBest = false;

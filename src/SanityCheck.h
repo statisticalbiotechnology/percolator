@@ -43,8 +43,9 @@ class SanityCheck {
     SECOND_CHANCE,  // as BINS; where that count would reset, the trained
                     // SVMs are kept if the merged out-of-fold list,
                     // rescaled by the training decoys, holds targets with
-                    // q < test FDR and no fewer than for the initial
-                    // direction counted in the same way
+                    // q < test FDR and no fewer than the reset would
+                    // report: the folds' default vectors merged with the
+                    // scheme of setMergeScheme
     POOLED          // in the merged out-of-fold list only, merged with the
                     // scheme of setMergeScheme
   };
@@ -80,9 +81,9 @@ class SanityCheck {
     return secondChanceMergeScheme_;
   }
   // how the test bins are merged, which the pooled check repeats, see
-  // Scores::merge and Scores::countMergedTargets; the second chance takes
-  // fdr and skipNormalizeScores from here and always counts with
-  // train-decoys
+  // Scores::merge and Scores::countMergedTargets; the second chance counts
+  // the trained SVMs with train-decoys and the fallback with this scheme,
+  // both with fdr and skipNormalizeScores from here
   void setMergeScheme(MergeNormalization scheme, double fdr,
                       bool skipNormalizeScores) {
     mergeScheme_ = scheme;
@@ -99,8 +100,14 @@ class SanityCheck {
   void setConcatenatedSearch(const bool s) { concatenatedSearch_ = s; }
 
  protected:
-  void getDefaultDirection(std::vector<Scores>& trainset,
-                           std::vector<std::vector<double> >& w);
+  void getDefaultDirection(const std::vector<Scores>& trainset,
+                           std::vector<std::vector<double> >& w) const;
+  // The vectors that resetDirection gives the folds, without its messages:
+  // the initial ones, which getDefaultDirection chose on the same training
+  // sets, unless they came from --init-weights. Empty when no default
+  // direction can be chosen, where the reset ends the run.
+  std::vector<std::vector<double> > resetVectors(
+      const std::vector<Scores>& trainset) const;
   // whether the targets are counted in the merged list of these bins
   bool usePooledCount(std::size_t numBins) const {
     return directionCheck_ == DirectionCheck::POOLED && numBins > 1u;
@@ -114,10 +121,12 @@ class SanityCheck {
   bool wrongSignOfDefaultDirection(
       const std::vector<std::vector<double> >& w) const;
   // The second chance: the targets with q < test FDR in the merged
-  // out-of-fold list with train-decoys for the trained weights w and for
-  // the initial direction of getInitDirection, and whether they keep w,
-  // which also needs the right sign of the --default-direction feature.
-  // Prints its decision.
+  // out-of-fold list with train-decoys for the trained weights w, against
+  // those of the fallback as the run would report it (resetVectors, merged
+  // with the scheme of setMergeScheme), and whether they keep w, which also
+  // needs the right sign of the --default-direction feature. Leaves the
+  // bins, the weights and the random number generator as they are. Prints
+  // its decision.
   bool secondChance(const std::vector<Scores>& testset,
                     const std::vector<Scores>& trainset,
                     const std::vector<std::vector<double> >& w,
@@ -140,8 +149,9 @@ class SanityCheck {
   MergeNormalization mergeScheme_ = MergeNormalization::TEST;
   double mergeFdr_ = 0.01;
   bool skipNormalizeScores_ = false;
-  // the second chance: the initial direction of each fold, its decision in
-  // the last validateDirection and the scheme of the merge it implies
+  // the second chance: the initial direction of each fold (the vectors of
+  // a reset unless --init-weights gave them), its decision in the last
+  // validateDirection and the scheme of the merge it implies
   std::vector<std::vector<double> > initWeights_;
   bool secondChanceKept_ = false;
   MergeNormalization secondChanceMergeScheme_ =
