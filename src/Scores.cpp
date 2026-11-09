@@ -133,7 +133,8 @@ int Scores::countMergedTargets(const std::vector<Scores>& testBins,
                                MergeNormalization scheme,
                                double fdr,
                                bool skipNormalizeScores,
-                               double testFdr) {
+                               double testFdr,
+                               ReportedLists lists) {
   // With separate searches, pi0 is estimated from bootstrap samples drawn
   // from the global generator, here for the merged list and, with the test
   // and train schemes, for the anchors of each bin. A count that moved the
@@ -184,7 +185,25 @@ int Scores::countMergedTargets(const std::vector<Scores>& testBins,
   if (merged.postMergeStep(false)) {
     return -1;
   }
-  return merged.calcQvals(testFdr);
+  const int count = merged.calcQvals(testFdr);
+  // The lists that the run makes from the merged one end it in the same
+  // way: dropping the decoy-like targets that lose their spectrum to a decoy
+  // (-Y) or their peptide to a better PSM can leave every target above
+  // every decoy, although the merged list does not separate too well.
+  if (lists.bestPsmPerSpectrum) {
+    merged.keepBestPsmPerSpectrum();
+    if (merged.separatesTooWell()) {
+      return -1;
+    }
+  }
+  if (lists.bestPsmPerPeptide) {
+    std::map<std::string, unsigned int> noSpecCounts;
+    merged.keepBestPsmPerPeptide(noSpecCounts, -1.0);
+    if (merged.separatesTooWell()) {
+      return -1;
+    }
+  }
+  return count;
 }
 
 double Scores::calcScore(const double* feat,
@@ -883,6 +902,13 @@ void Scores::weedOutRedundant() {
 void Scores::weedOutRedundant(
     std::map<std::string, unsigned int>& peptideSpecCounts,
     double specCountQvalThreshold) {
+  keepBestPsmPerPeptide(peptideSpecCounts, specCountQvalThreshold);
+  postMergeStep();
+}
+
+void Scores::keepBestPsmPerPeptide(
+    std::map<std::string, unsigned int>& peptideSpecCounts,
+    double specCountQvalThreshold) {
   // lexicographically order the scores_ (based on peptides names,labels and
   // scores)
   std::sort(scores_.begin(), scores_.end(), lexicOrderProb());
@@ -907,13 +933,17 @@ void Scores::weedOutRedundant(
     }
   }
   scores_.resize(lastWrittenIdx);
-  postMergeStep();
 }
 
 /**
  * Routine that sees to that only unique spectra are kept for TDC
  */
 void Scores::weedOutRedundantTDC() {
+  keepBestPsmPerSpectrum();
+  postMergeStep();
+}
+
+void Scores::keepBestPsmPerSpectrum() {
   // order the scores (based on spectra id and score)
   std::sort(scores_.begin(), scores_.end(), OrderScanMassCharge());
   scores_.erase(
@@ -938,7 +968,6 @@ void Scores::weedOutRedundantTDC() {
   }
   scores_.resize(lastWrittenIdx);
   */
-  postMergeStep();
 }
 
 int Scores::getInitDirection(const double initialSelectionFdr,
@@ -1020,12 +1049,22 @@ int Scores::getInitDirection(const double initialSelectionFdr,
   return bestPositives;
 }
 
-bool Scores::checkSeparationAndSetPi0(bool tooGoodSeparationIsError) {
+void Scores::getTargetPValues(std::vector<double>& pvals) {
   std::vector<pair<double, bool> > combined;
   getScoreLabelPairs(combined);
-
-  std::vector<double> pvals;
   PosteriorEstimator::getPValues(combined, pvals);
+}
+
+bool Scores::separatesTooWell() {
+  sort(scores_.begin(), scores_.end(), greater<ScoreHolder>());
+  std::vector<double> pvals;
+  getTargetPValues(pvals);
+  return PosteriorEstimator::checkSeparation(pvals);
+}
+
+bool Scores::checkSeparationAndSetPi0(bool tooGoodSeparationIsError) {
+  std::vector<double> pvals;
+  getTargetPValues(pvals);
 
   pi0_ = 1.0;
   bool tooGoodSeparation = PosteriorEstimator::checkSeparation(pvals);
