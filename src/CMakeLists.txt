@@ -11,8 +11,10 @@ MESSAGE( STATUS "Checking packages:" )
 
 set(COMMON_LIBRARIES "")
 find_package(OpenMP)
-# Help AppleClang find Homebrew's libomp if not auto-detected
-if(APPLE AND NOT OpenMP_CXX_FOUND)
+# Help AppleClang find Homebrew's libomp if not auto-detected. Conda builds
+# turn this off, so that they never link to a library outside the environment.
+option(HOMEBREW_LIBOMP "On macOS, fall back to Homebrew's libomp if OpenMP is not found" ON)
+if(APPLE AND NOT OpenMP_CXX_FOUND AND HOMEBREW_LIBOMP)
   # Common Homebrew prefix on Apple Silicon
   set(_HOMEBREW_OMP_ROOT "/opt/homebrew/opt/libomp")
   if (EXISTS "${_HOMEBREW_OMP_ROOT}/include" AND EXISTS "${_HOMEBREW_OMP_ROOT}/lib")
@@ -127,10 +129,13 @@ endif()
 # Avoid adding Eigen's blas directory (explicitly ignore it)
 set(EIGEN_DISABLE_BLAS ON CACHE BOOL "Disable Eigen's BLAS build" FORCE)
 
+# EXCLUDE_FROM_ALL (CMake 3.28 or later) keeps Eigen's headers and CMake
+# files out of "make install" and the packages; only its headers are used.
 FetchContent_Declare(
   eigen
   GIT_REPOSITORY https://gitlab.com/libeigen/eigen.git
   GIT_TAG 3.4.0
+  EXCLUDE_FROM_ALL
 )
 
 FetchContent_MakeAvailable(eigen)
