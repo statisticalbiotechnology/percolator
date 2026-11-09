@@ -69,7 +69,9 @@ set(Boost_NO_BOOST_CMAKE ON CACHE BOOL "" FORCE)
 if(APPLE)
   find_package(Boost ${BOOST_MIN_VERSION} COMPONENTS filesystem REQUIRED)
 else()
-  find_package(Boost ${BOOST_MIN_VERSION} COMPONENTS filesystem system REQUIRED)
+  # Boost.System is header-only since 1.69, and 1.89 removed its stub
+  # library, so it is linked only where it exists.
+  find_package(Boost ${BOOST_MIN_VERSION} COMPONENTS filesystem OPTIONAL_COMPONENTS system REQUIRED)
 endif()
 
 add_definitions(-DBOOST_SYSTEM_NO_DEPRECATED)
@@ -81,7 +83,7 @@ endif()
 
 include_directories(${Boost_INCLUDE_DIRS})
 list(APPEND COMMON_LIBRARIES Boost::filesystem)
-if(NOT APPLE)
+if(NOT APPLE AND TARGET Boost::system)
   list(APPEND COMMON_LIBRARIES Boost::system)
 endif()
 
