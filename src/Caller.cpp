@@ -428,7 +428,8 @@ bool Caller::parseOptions(int argc, char** argv) {
       "folds' default directions, "
       "merged as the run merges (test up to 3 folds). Small test bins alone "
       "then do not discard the trained SVMs; a run that keeps them is "
-      "merged with train-decoys unless --merge-normalization is given. "
+      "merged with train-decoys, or with the scheme of "
+      "--merge-normalization, whose list has to be usable as well. "
       "Runs that pass 'bins' are not changed. With one fold, as with "
       "--reset-algorithm, all three are the same. With -N the check uses "
       "the PSMs trained on, and with --static "
@@ -763,7 +764,9 @@ bool Caller::parseOptions(int argc, char** argv) {
     }
   }
   // The second chance counts with train-decoys and merges with it when it
-  // keeps the trained SVMs; an explicit scheme is used in that case too.
+  // keeps the trained SVMs; an explicit scheme is used in that case too, and
+  // the second chance then keeps them only if their list merged with that
+  // scheme can be used as well.
   if (cmd.isOptionSet("merge-normalization")) {
     check_.setSecondChanceMergeScheme(mergeNormalization_);
   }
