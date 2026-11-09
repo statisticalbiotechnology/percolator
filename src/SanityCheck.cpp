@@ -160,8 +160,8 @@ bool SanityCheck::secondChance(const vector<Scores>& testset,
        << (skipNormalizeScores_ ? "" : ", rescaled by the training decoys")
        << ": ";
   if (trainedCount < 0) {
-    cerr << "the scores of a test bin cannot be rescaled with the trained "
-         << "weights";
+    cerr << "the trained SVMs give no usable list (the scores of a test bin "
+         << "cannot be rescaled, or targets and decoys separate too well)";
   } else {
     cerr << trainedCount << " targets with q<" << test_fdr_
          << " for the trained SVMs, " << initCount
@@ -198,8 +198,9 @@ bool SanityCheck::validateDirection(vector<Scores>& testset,
                                          mergeFdr_, skipNormalizeScores_,
                                          test_fdr_);
     if (overFDR < 0) {
-      cerr << "The scores of a test bin cannot be rescaled to merge the "
-           << "bins with the trained weights" << endl;
+      cerr << "The trained weights give no usable merged out-of-fold list: "
+           << "the scores of a test bin cannot be rescaled, or targets and "
+           << "decoys separate too well" << endl;
       resetDirection(trainset, w);
       return false;
     }
@@ -232,7 +233,8 @@ bool SanityCheck::validateDirection(vector<Scores>& testset,
     if (!keptBySecondChance) {
       resetDirection(trainset, w);
       if (overFDR <= 0 && !overRule_) {
-        if (pooled || (secondChanceTried && pooledCount <= 0)) {
+        // not for an unusable merged list (-1), whose reason is printed
+        if (pooled || (secondChanceTried && pooledCount == 0)) {
           cerr << "Hint: q<" << test_fdr_ << " needs about "
                << 1.0 / test_fdr_ << " targets above the best-scoring decoy "
                << "of the merged list; a larger --testFDR is an alternative."
