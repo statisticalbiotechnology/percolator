@@ -30,8 +30,8 @@ math libraries round differently; the Build workflow lists the differences
 
 A Python wheel that holds only the percolator and qvality executables is
 built with `python -m build --wheel` (pyproject.toml), and for all
-platforms by the Wheels workflow. Its name on PyPI is percolator-cpp;
-nothing is uploaded there yet.
+platforms by the Wheels workflow. Its name on PyPI is percolator-cpp; a
+release published on GitHub uploads the wheels there.
 
 The cleanest way to build is to use the vagrant virtual machine
 system, which can be setup using the script: admin/vagrant/manager.sh

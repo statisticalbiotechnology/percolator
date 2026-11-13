@@ -2,10 +2,12 @@ name: Wheels
 
 # Builds the binaries-only Python wheels (pyproject.toml) with cibuildwheel
 # and the source distribution, tests each wheel (admin/wheels/check_wheel.py)
-# and uploads them as artifacts. Nothing is published yet; the name on PyPI
-# is percolator-cpp (pyproject.toml).
+# and uploads them as artifacts. When a release is published on GitHub, the
+# job publish uploads them to PyPI as percolator-cpp (pyproject.toml).
 on:
   workflow_dispatch:
+  release:
+    types: [published]
   pull_request:
     paths:
       - pyproject.toml
@@ -80,3 +82,32 @@ jobs:
       with:
         name: sdist
         path: dist/*.tar.gz
+
+  # Uploads the five wheels and the source distribution to PyPI when a
+  # release of percolator/percolator is published. PyPI accepts the upload by
+  # trusted publishing (OpenID Connect): the project percolator-cpp names this
+  # repository and this workflow as its publisher, so no token is stored. The
+  # version comes from CommonCMake.txt ("3.09.0" becomes 3.9.0); PyPI refuses
+  # a version it already holds, so the version is raised before a release.
+  publish:
+    if: github.event_name == 'release' && github.repository == 'percolator/percolator'
+    needs: [wheel, sdist]
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/project/percolator-cpp/
+    permissions:
+      id-token: write
+    steps:
+    - uses: actions/download-artifact@v4
+      with:
+        path: dist
+        merge-multiple: true
+    - name: list
+      # five wheels and one source distribution, or nothing is uploaded
+      shell: bash
+      run: |
+        ls -l dist
+        test "$(ls dist/*.whl | wc -l)" -eq 5
+        test "$(ls dist/*.tar.gz | wc -l)" -eq 1
+    - uses: pypa/gh-action-pypi-publish@release/v1
