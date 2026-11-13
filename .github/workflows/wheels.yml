@@ -2,12 +2,8 @@ name: Wheels
 
 # Builds the binaries-only Python wheels (pyproject.toml) with cibuildwheel
 # and the source distribution, tests each wheel (admin/wheels/check_wheel.py)
-# and uploads them as artifacts. Nothing is published: the name on PyPI is
-# still to be decided (see pyproject.toml).
-#
-# The Linux wheel was built and compared with the CMake build when this was
-# written, without cibuildwheel's container. The macOS and Windows jobs have
-# not run yet.
+# and uploads them as artifacts. Nothing is published yet; the name on PyPI
+# is percolator-cpp (pyproject.toml).
 on:
   workflow_dispatch:
   pull_request:
